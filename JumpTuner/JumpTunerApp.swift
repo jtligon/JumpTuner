@@ -1,9 +1,4 @@
-//
-//  JumpTunerApp.swift
-//  JumpTuner
-//
-//  Created by Jeff Ligon on 4/25/26.
-//
+// JumpTunerApp.swift
 
 import SwiftUI
 
