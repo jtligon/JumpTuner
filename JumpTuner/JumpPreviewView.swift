@@ -65,6 +65,7 @@ struct JumpPreviewView: View {
     @State private var scaleY:    CGFloat = 1      // vertical squash/stretch
     @State private var phase:     String  = "idle" // current phase name → robot pose
     @State private var jumpTimer: Timer?  = nil
+    @State private var containerHeight: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -130,9 +131,10 @@ struct JumpPreviewView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .onAppear { containerHeight = geo.size.height }
             // When params change while animating, restart the cycle immediately
             // so the loop always reflects current slider values.
-            .onChange(of: params) { _ in
+            .onChange(of: params) {
                 if animating { restartAnimation() }
             }
         }
@@ -171,7 +173,7 @@ struct JumpPreviewView: View {
         // Scale jumpHeight (0–500) to actual usable screen pixels.
         // This ensures the slider value means the same thing visually
         // on any device size.
-        let screenH = Double(UIScreen.main.bounds.height)
+        let screenH = Double(containerHeight)
         let groundClearance = 60.0   // ground strip height + robot foot offset
         let maxPixels = screenH - groundClearance
         let scaledHeight = (p.jumpHeight / 500.0) * maxPixels
