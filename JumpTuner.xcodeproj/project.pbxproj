@@ -23,11 +23,20 @@
 
 /* Begin PBXFileReference section */
 		7C21C7DB2F9D9BF60002AF98 /* JumpTuner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JumpTuner.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		7C5C83272FD7481000FEFFE7 /* JumpTuner.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = JumpTuner.xctestplan; sourceTree = "<group>"; };
 		7C69EB052FB0407F001E3427 /* JumpTunerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JumpTunerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7C92AF5C2F9EB9E700DA02C5 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 		7C92AF682F9EB9E700DA02C5 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		7C23A6602FDB5CB50030045C /* Exceptions for "JumpTunerTests" folder in "JumpTunerTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				JumpTuner.xctestplan,
+			);
+			target = 7C69EB042FB0407F001E3427 /* JumpTunerTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7C21C7DD2F9D9BF60002AF98 /* JumpTuner */ = {
@@ -37,6 +46,9 @@
 		};
 		7C69EB062FB0407F001E3427 /* JumpTunerTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7C23A6602FDB5CB50030045C /* Exceptions for "JumpTunerTests" folder in "JumpTunerTests" target */,
+			);
 			path = JumpTunerTests;
 			sourceTree = "<group>";
 		};
@@ -63,7 +75,6 @@
 		7C21C7D22F9D9BF60002AF98 = {
 			isa = PBXGroup;
 			children = (
-				7C5C83272FD7481000FEFFE7 /* JumpTuner.xctestplan */,
 				7C92AF682F9EB9E700DA02C5 /* README.md */,
 				7C92AF5C2F9EB9E700DA02C5 /* ARCHITECTURE.md */,
 				7C21C7DD2F9D9BF60002AF98 /* JumpTuner */,
@@ -205,7 +216,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Type a script or drag a script file from your workspace to insert its path.\nBUILD_NUMBER=$(git -C \"$SRCROOT\" rev-list --count HEAD)\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $BUILD_NUMBER\" \"$INFOPLIST_FILE\"\n";
+			shellScript = "BUILD_NUMBER=$(git -C \"$SRCROOT\" rev-list --count HEAD)\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $BUILD_NUMBER\" \"$INFOPLIST_FILE\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $BUILD_NUMBER\" \"$INFOPLIST_FILE\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -369,11 +380,13 @@
 				DEVELOPMENT_TEAM = X8AJKS4Y4R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -403,11 +416,13 @@
 				DEVELOPMENT_TEAM = X8AJKS4Y4R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
