@@ -63,6 +63,8 @@ struct JumpPreviewView: View {
     /// Two-way binding to the current params. The view reads params for
     /// animation and writes nothing back — it's purely a consumer.
     @Binding var params: JumpParams
+    /// Incremented by the parent to trigger a jump from outside the view.
+    @Binding var jumpTrigger: Int
 
     // MARK: Animation state
     @State private var animating: Bool    = false
@@ -144,6 +146,9 @@ struct JumpPreviewView: View {
             .onChange(of: params) {
                 if animating { restartAnimation() }
             }
+            .onChange(of: jumpTrigger) {
+                triggerJump()
+            }
         }
         .ignoresSafeArea()
     }
@@ -165,6 +170,10 @@ struct JumpPreviewView: View {
         guard !animating else { return }
         animating = true
         runCycle()
+    }
+
+    func triggerJump() {
+        if animating { restartAnimation() } else { startAnimation() }
     }
 
     // MARK: - Core animation loop
@@ -294,6 +303,6 @@ struct JumpPreviewView: View {
 }
 
 #Preview {
-    JumpPreviewView(params: .constant(.defaults))
+    JumpPreviewView(params: .constant(.defaults), jumpTrigger: .constant(0))
         .ignoresSafeArea()
 }

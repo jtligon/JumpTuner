@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var selectedQRPreset: Preset?
     @State private var drawerOpen       = true
     @State private var showHelp         = false
+    @State private var jumpTrigger      = 0
 
     private let drawerWidth: CGFloat = 280
 
@@ -16,8 +17,11 @@ struct ContentView: View {
             ZStack(alignment: .trailing) {
 
                 // Full-screen preview — always fills the whole screen
-                JumpPreviewView(params: $params)
+                JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger)
                     .ignoresSafeArea()
+                    .onTapGesture {
+                        if !drawerOpen { jumpTrigger += 1 }
+                    }
 
                 // Tab to open/close the drawer, pinned to the right edge
                 // when the drawer is closed, left edge of drawer when open
