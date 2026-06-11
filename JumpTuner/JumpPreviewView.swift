@@ -26,25 +26,32 @@ import SwiftUI
 // MARK: - Stars background
 
 /// Decorative starfield rendered behind the robot.
-/// Stars are generated once as random (x, y, size) triples and held as
-/// a `let` constant so they don't re-randomize on re-render.
+/// Stars are generated once as random (x, y, size, opacity) tuples so they
+/// don't re-randomize on re-render. `TimelineView` drives continuous right-to-left
+/// scrolling by offsetting each star's x position from the current timestamp.
 struct StarsView: View {
-    let stars: [(CGFloat, CGFloat, CGFloat)] = (0..<45).map { _ in
+    let stars: [(CGFloat, CGFloat, CGFloat, Double)] = (0..<45).map { _ in
         (CGFloat.random(in: 0...1),
          CGFloat.random(in: 0...0.9),
-         CGFloat.random(in: 1...3))
+         CGFloat.random(in: 1...3),
+         Double.random(in: 0.3...0.8))
     }
 
+    private let scrollSpeed: CGFloat = 30  // points per second
+
     var body: some View {
-        GeometryReader { geo in
-            ForEach(0..<stars.count, id: \.self) { i in
-                Circle()
-                    .fill(Color.white.opacity(Double.random(in: 0.3...0.8)))
-                    .frame(width: stars[i].2, height: stars[i].2)
-                    .position(
-                        x: stars[i].0 * geo.size.width,
-                        y: stars[i].1 * geo.size.height
-                    )
+        TimelineView(.animation) { context in
+            GeometryReader { geo in
+                let elapsed = CGFloat(context.date.timeIntervalSinceReferenceDate)
+                let offset = (elapsed * scrollSpeed).truncatingRemainder(dividingBy: geo.size.width)
+                ForEach(0..<stars.count, id: \.self) { i in
+                    let x = (stars[i].0 * geo.size.width - offset + geo.size.width)
+                        .truncatingRemainder(dividingBy: geo.size.width)
+                    Circle()
+                        .fill(Color.white.opacity(stars[i].3))
+                        .frame(width: stars[i].2, height: stars[i].2)
+                        .position(x: x, y: stars[i].1 * geo.size.height)
+                }
             }
         }
     }
