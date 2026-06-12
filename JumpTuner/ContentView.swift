@@ -10,7 +10,7 @@ struct ContentView: View {
     @State private var showHelp         = false
     @State private var jumpTrigger      = 0
 
-    private let drawerWidth: CGFloat = 280
+    private let drawerWidth: CGFloat = 260
 
     var body: some View {
         GeometryReader { geo in
@@ -99,7 +99,7 @@ struct ContentView: View {
                     }
                 }
                 .frame(width: drawerWidth)
-                .background(.ultraThinMaterial)
+                .adaptiveGlassBackground()
                 .offset(x: drawerOpen ? 0 : drawerWidth)
             }
         }

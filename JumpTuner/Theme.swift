@@ -8,6 +8,20 @@
 
 import SwiftUI
 
+// MARK: - Adaptive background
+
+extension View {
+    /// Applies Liquid Glass on iOS 26+; falls back to ultraThinMaterial on older OS.
+    @ViewBuilder
+    func adaptiveGlassBackground() -> some View {
+        if #available(iOS 26, *) {
+            self.glassEffect(in: .rect())
+        } else {
+            self.background(.ultraThinMaterial)
+        }
+    }
+}
+
 // MARK: - Scene colors
 
 extension Color {

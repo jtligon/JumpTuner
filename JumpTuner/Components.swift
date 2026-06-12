@@ -31,7 +31,7 @@ struct LabeledSlider: View {
                 .frame(width: 38, alignment: .trailing)
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 7)
+        .padding(.vertical, 5)
     }
 }
 
@@ -48,7 +48,7 @@ struct LabeledToggle: View {
             .foregroundColor(.secondary)
             .tint(color)
             .padding(.horizontal, 16)
-            .padding(.vertical, 7)
+            .padding(.vertical, 5)
     }
 }
 
@@ -91,15 +91,15 @@ struct CollapsibleSection<Content: View>: View {
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 11)
-                .background(Color(.secondarySystemGroupedBackground))
+                .padding(.vertical, 9)
+                .background(Color.clear)
             }
             .buttonStyle(.plain)
 
             // Expandable content
             if expanded {
                 VStack(spacing: 0) { content() }
-                    .background(Color(.systemGroupedBackground))
+                    .background(Color.clear)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
