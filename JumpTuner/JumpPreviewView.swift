@@ -30,7 +30,7 @@ import SwiftUI
 /// don't re-randomize on re-render. `TimelineView` drives continuous right-to-left
 /// scrolling by offsetting each star's x position from the current timestamp.
 struct StarsView: View {
-    let stars: [(CGFloat, CGFloat, CGFloat, Double)] = (0..<45).map { _ in
+    @State private var stars: [(CGFloat, CGFloat, CGFloat, Double)] = (0..<45).map { _ in
         (CGFloat.random(in: 0...1),
          CGFloat.random(in: 0...0.9),
          CGFloat.random(in: 1...3),
