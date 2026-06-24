@@ -18,7 +18,10 @@ default_platform(:ios)
 platform :ios do
   desc "Build and test on simulator"
   lane :test do
-    run_tests(scheme: "JumpTuner")
+    run_tests(
+      scheme: "JumpTuner",
+      destination: "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro"
+    )
   end
 
   desc "Push a new beta build to TestFlight"
