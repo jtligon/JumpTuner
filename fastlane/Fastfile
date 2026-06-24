@@ -16,6 +16,15 @@
 default_platform(:ios)
 
 platform :ios do
+  desc "Build and test on simulator"
+  lane :test do
+    run_tests(
+      scheme: "JumpTuner",
+      devices: ["iPhone 16"],
+      testplan: "JumpTuner"
+    )
+  end
+
   desc "Push a new beta build to TestFlight"
   lane :beta do
     increment_build_number(
