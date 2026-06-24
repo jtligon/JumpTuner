@@ -25,32 +25,63 @@ import SwiftUI
 
 // MARK: - Stars background
 
-/// Decorative starfield rendered behind the robot.
-/// Stars are generated once as random (x, y, size, opacity) tuples so they
-/// don't re-randomize on re-render. `TimelineView` drives continuous right-to-left
+/// Decorative starfield and planet layer rendered behind the robot.
+///
+/// Stars and planets are generated once at max capacity so positions stay
+/// stable as more elements are revealed. `SkyProgress` controls how many
+/// are currently visible. `TimelineView` drives continuous right-to-left
 /// scrolling by offsetting each star's x position from the current timestamp.
 struct StarsView: View {
-    @State private var stars: [(CGFloat, CGFloat, CGFloat, Double)] = (0..<45).map { _ in
-        (CGFloat.random(in: 0...1),
-         CGFloat.random(in: 0...0.9),
-         CGFloat.random(in: 1...3),
-         Double.random(in: 0.3...0.8))
-    }
+    var progress: SkyProgress = SkyProgress(jumpCount: 0)
 
-    private let scrollSpeed: CGFloat = 30  // points per second
+    // Pre-generate max capacity; reveal subset based on progress.
+    @State private var stars: [(CGFloat, CGFloat, CGFloat, Double)] =
+        (0..<SkyProgress.maxStars).map { _ in
+            (CGFloat.random(in: 0...1),
+             CGFloat.random(in: 0...0.9),
+             CGFloat.random(in: 1...3),
+             Double.random(in: 0.3...0.8))
+        }
+
+    // Planets: fixed positions, distinct colors, larger sizes.
+    @State private var planets: [(CGFloat, CGFloat, CGFloat, Color)] =
+        (0..<SkyProgress.maxPlanets).map { _ in
+            (CGFloat.random(in: 0.05...0.95),
+             CGFloat.random(in: 0.05...0.55),
+             CGFloat.random(in: 10...22),
+             [Color(red: 0.8, green: 0.5, blue: 0.3),
+              Color(red: 0.4, green: 0.6, blue: 0.9),
+              Color(red: 0.7, green: 0.8, blue: 0.5)].randomElement()!)
+        }
+
+    private let scrollSpeed: CGFloat     = 30   // stars scroll speed (pts/sec)
+    private let planetScrollSpeed: CGFloat = 8  // planets scroll slower (parallax)
 
     var body: some View {
         TimelineView(.animation) { context in
             GeometryReader { geo in
                 let elapsed = CGFloat(context.date.timeIntervalSinceReferenceDate)
-                let offset = (elapsed * scrollSpeed).truncatingRemainder(dividingBy: geo.size.width)
-                ForEach(0..<stars.count, id: \.self) { i in
-                    let x = (stars[i].0 * geo.size.width - offset + geo.size.width)
+                let starOffset   = (elapsed * scrollSpeed).truncatingRemainder(dividingBy: geo.size.width)
+                let planetOffset = (elapsed * planetScrollSpeed).truncatingRemainder(dividingBy: geo.size.width)
+
+                // Stars
+                ForEach(0..<progress.visibleStars, id: \.self) { i in
+                    let x = (stars[i].0 * geo.size.width - starOffset + geo.size.width)
                         .truncatingRemainder(dividingBy: geo.size.width)
                     Circle()
                         .fill(Color.white.opacity(stars[i].3))
                         .frame(width: stars[i].2, height: stars[i].2)
                         .position(x: x, y: stars[i].1 * geo.size.height)
+                }
+
+                // Planets — scroll at a slower rate for depth
+                ForEach(0..<progress.visiblePlanets, id: \.self) { i in
+                    let x = (planets[i].0 * geo.size.width - planetOffset + geo.size.width)
+                        .truncatingRemainder(dividingBy: geo.size.width)
+                    Circle()
+                        .fill(planets[i].3.opacity(0.75))
+                        .frame(width: planets[i].2, height: planets[i].2)
+                        .position(x: x, y: planets[i].1 * geo.size.height)
                 }
             }
         }
@@ -75,6 +106,7 @@ struct JumpPreviewView: View {
     @State private var phase:     String  = "idle" // current phase name → robot pose
     @State private var jumpTimer: Timer?  = nil
     @State private var containerHeight: CGFloat = 0
+    @State private var jumpCount: Int     = 0      // completed loop count → sky progress
 
     var body: some View {
         GeometryReader { geo in
@@ -84,7 +116,7 @@ struct JumpPreviewView: View {
                     colors: [Color.skyTop, Color.skyBottom],
                     startPoint: .top, endPoint: .bottom
                 )
-                StarsView()
+                StarsView(progress: SkyProgress(jumpCount: jumpCount))
 
                 // Ground strip — a solid line + translucent fill
                 VStack(spacing: 0) {
@@ -159,6 +191,7 @@ struct JumpPreviewView: View {
         jumpTimer?.invalidate(); jumpTimer = nil
         animating = false; phase = "idle"
         charY = 0; scaleX = 1; scaleY = 1
+        jumpCount = 0
     }
 
     func restartAnimation() {
@@ -235,6 +268,7 @@ struct JumpPreviewView: View {
                 tmr.invalidate()
                 charY = 0; scaleX = 1; scaleY = 1; phase = "idle"
                 if looping {
+                    jumpCount += 1
                     // Brief pause between loops for readability
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                         if animating { runCycle() }
