@@ -19,8 +19,9 @@ platform :ios do
   desc "Build and test on simulator"
   lane :test do
     run_tests(
-      scheme: "JumpTuner",
-      destination: "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro"
+      scheme:         "JumpTuner",
+      destination:    "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro",
+      result_bundle:  true
     )
   end
 
@@ -32,5 +33,35 @@ platform :ios do
     )
     build_app(scheme: "JumpTuner")
     upload_to_testflight
+  end
+
+  desc "Build a PR branch and upload to TestFlight for review"
+  lane :pr_beta do
+    pr_number = ENV.fetch("PR_NUMBER", "0")
+    pr_title  = ENV.fetch("PR_TITLE",  "PR build")
+
+    api_key = app_store_connect_api_key(
+      key_id:                ENV["ASC_KEY_ID"],
+      issuer_id:             ENV["ASC_ISSUER_ID"],
+      key_content:           ENV["ASC_KEY_CONTENT"],
+      is_key_content_base64: true
+    )
+
+    increment_build_number(
+      build_number: latest_testflight_build_number(api_key: api_key) + 1,
+      xcodeproj:    "JumpTuner.xcodeproj"
+    )
+
+    build_app(
+      scheme:        "JumpTuner",
+      export_method: "app-store",
+      xcargs:        "-allowProvisioningUpdates"
+    )
+
+    upload_to_testflight(
+      api_key:                           api_key,
+      skip_waiting_for_build_processing: true,
+      changelog:                         "PR ##{pr_number}: #{pr_title}"
+    )
   end
 end
