@@ -20,8 +20,7 @@ platform :ios do
   lane :test do
     run_tests(
       scheme: "JumpTuner",
-      devices: ["iPhone 16"],
-      testplan: "JumpTuner"
+      devices: ["iPhone 16"]
     )
   end
 
