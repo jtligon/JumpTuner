@@ -1,27 +1,12 @@
 // JumpPreviewView.swift
 //
-// Full-screen animated preview of the jump cycle.
+// Full-screen animated preview of the jump cycle, powered by SpriteKit.
 //
-// ## Animation architecture
-//
-// The animation runs on a 60fps `Timer` rather than SwiftUI's animation
-// system. This is intentional: we need frame-accurate control over the
-// physics curve, and SwiftUI's spring/easing animations are designed for
-// UI transitions, not game-loop style per-frame computation.
-//
-// Each jump is a sequence of named phases. The timer computes which phase
-// we're in and how far through it (0.0–1.0), then applies the appropriate
-// position and squash/stretch transform.
-//
-// ## Live param updates
-//
-// `JumpParams` is captured by value at the start of `runCycle()`. When
-// `onChange(of: params)` fires mid-animation (e.g. a slider moved or
-// randomize was tapped), `restartAnimation()` kills the current timer and
-// starts a fresh cycle with the new values. This ensures the loop always
-// reflects the current sliders without any stale-capture bugs.
+// JumpScene owns the physics simulation and character. This view wraps it in
+// SpriteView and overlays the SwiftUI play/loop controls on top.
 
 import SwiftUI
+import SpriteKit
 
 // MARK: - Stars background
 
@@ -91,52 +76,37 @@ struct StarsView: View {
 // MARK: - Jump preview
 
 struct JumpPreviewView: View {
-    /// Two-way binding to the current params. The view reads params for
-    /// animation and writes nothing back — it's purely a consumer.
     @Binding var params: JumpParams
-    /// Incremented by the parent to trigger a jump from outside the view.
     @Binding var jumpTrigger: Int
 
-    // MARK: Animation state
-    @State private var animating: Bool    = false
-    @State private var looping:   Bool    = false
-    @State private var charY:     CGFloat = 0      // pixels above ground
-    @State private var scaleX:    CGFloat = 1      // horizontal squash/stretch
-    @State private var scaleY:    CGFloat = 1      // vertical squash/stretch
-    @State private var phase:     String  = "idle" // current phase name → robot pose
-    @State private var jumpTimer: Timer?  = nil
-    @State private var containerHeight: CGFloat = 0
-    @State private var jumpCount: Int     = 0      // completed loop count → sky progress
+    @State private var looping: Bool = false
+    @State private var animating: Bool = false
+    @State private var selectedSkin: CharacterSkin = .robot
+    @State private var customSkins: [CharacterSkin] = []
+    @State private var showingPhotoPicker = false
+
+    @State private var scene: JumpScene = {
+        let s = JumpScene()
+        s.scaleMode = .resizeFill
+        return s
+    }()
+
+    private var allSkins: [CharacterSkin] { CharacterSkin.builtIn + customSkins }
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
-                // Sky gradient
-                LinearGradient(
-                    colors: [Color.skyTop, Color.skyBottom],
-                    startPoint: .top, endPoint: .bottom
-                )
-                StarsView(progress: SkyProgress(jumpCount: jumpCount))
+                SpriteView(scene: scene)
+                    .ignoresSafeArea()
 
-                // Ground strip — a solid line + translucent fill
+                // Controls — top bar
                 VStack(spacing: 0) {
-                    Rectangle().fill(Color.groundColor).frame(height: 3)
-                    Rectangle().fill(Color.groundColor.opacity(0.25)).frame(height: 28)
-                }
-
-                // Robot character — positioned left of center so there's room
-                // for the side drawer without obscuring the jump arc.
-                // charY is in pixels above the ground line; negate for SwiftUI's
-                // coordinate system where y increases downward.
-                RobotView(scaleX: scaleX, scaleY: scaleY, phase: phase)
-                    .frame(width: 44, height: 44)
-                    .offset(x: -geo.size.width * 0.2, y: -(charY + 22))
-
-                // Play + loop controls — top left, always clear of the drawer
-                VStack {
                     HStack(spacing: 10) {
                         // Loop toggle
-                        Button { looping.toggle() } label: {
+                        Button {
+                            looping.toggle()
+                            scene.isLooping = looping
+                        } label: {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 12)
                                     .fill(looping
@@ -161,183 +131,100 @@ struct JumpPreviewView: View {
 
                         // Play / stop
                         ControllerButton(isPlaying: animating) {
-                            animating ? stopAnimation() : startAnimation()
+                            if animating {
+                                animating = false
+                                scene.stopJumping()
+                            } else {
+                                animating = true
+                                scene.triggerJump()
+                            }
                         }
 
                         Spacer()
+
+                        // Character picker — built-in + generated, plus a + button
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(allSkins) { skin in
+                                    SkinChip(skin: skin, isSelected: skin.id == selectedSkin.id) {
+                                        selectedSkin = skin
+                                        scene.setCharacter(skin)
+                                    }
+                                }
+
+                                // Add custom skin via photo
+                                Button {
+                                    showingPhotoPicker = true
+                                } label: {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.75))
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(Color.white.opacity(0.12))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                                )
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 2)
+                        }
+                        .frame(maxWidth: 240)
+                        .padding(.trailing, 16)
                     }
                     .padding(.leading, 16)
-                    .padding(.top, 56)   // below status bar
+                    .padding(.top, 56)
                     Spacer()
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .onAppear { containerHeight = geo.size.height }
-            // When params change while animating, restart the cycle immediately
-            // so the loop always reflects current slider values.
-            .onChange(of: params) {
-                if animating { restartAnimation() }
-            }
-            .onChange(of: jumpTrigger) {
-                triggerJump()
-            }
         }
         .ignoresSafeArea()
-    }
-
-    // MARK: - Animation control
-
-    func stopAnimation() {
-        jumpTimer?.invalidate(); jumpTimer = nil
-        animating = false; phase = "idle"
-        charY = 0; scaleX = 1; scaleY = 1
-        jumpCount = 0
-    }
-
-    func restartAnimation() {
-        jumpTimer?.invalidate(); jumpTimer = nil
-        runCycle()
-    }
-
-    func startAnimation() {
-        guard !animating else { return }
-        animating = true
-        runCycle()
-    }
-
-    func triggerJump() {
-        if animating { restartAnimation() } else { startAnimation() }
-    }
-
-    // MARK: - Core animation loop
-
-    /// Runs one complete jump cycle using a 60fps Timer.
-    ///
-    /// Params are captured by value at entry so slider changes mid-cycle
-    /// don't corrupt the in-progress jump. `onChange` triggers a fresh
-    /// `runCycle()` call when params change.
-    private func runCycle() {
-        let p = params
-
-        // Scale jumpHeight (0–500) to actual usable screen pixels.
-        // This ensures the slider value means the same thing visually
-        // on any device size.
-        let screenH = Double(containerHeight)
-        let groundClearance = 60.0   // ground strip height + robot foot offset
-        let maxPixels = screenH - groundClearance
-        let scaledHeight = (p.jumpHeight / 500.0) * maxPixels
-
-        // Each phase has a name (used to drive robot arm/eye poses) and
-        // a duration in frames at 60fps.
-        struct PhaseStep { let name: String; let dur: Double }
-        let steps: [PhaseStep] = [
-            .init(name: "squat",   dur: p.squatFrames),                            // anticipation crouch
-            .init(name: "launch",  dur: 2),                                         // leaving the ground
-            .init(name: "ascent",  dur: p.ascentFrames),                           // rising arc
-            .init(name: "apex",    dur: p.apexFrames),                             // brief peak pause
-            .init(name: "float",   dur: p.features.floating ? p.floatFrames : 0), // hover at peak
-            .init(name: "descent", dur: p.descentFrames),                          // falling arc
-            .init(name: "land",    dur: 2),                                         // ground contact
-            .init(name: "landing", dur: p.landingFrames),                          // impact squash hold
-            .init(name: "recover", dur: 4),                                         // return to idle
-        ]
-        let total = steps.reduce(0.0) { $0 + $1.dur }
-
-        // Smoothstep easing — accelerates in, decelerates out.
-        // Used for position and scale interpolation within each phase.
-        func ease(_ t: Double) -> Double { t < 0.5 ? 2*t*t : -1+(4-2*t)*t }
-
-        // Linear interpolation helper.
-        func lerp(_ a: Double, _ b: Double, _ t: Double) -> Double { a + (b-a)*t }
-
-        // Returns (phaseName, localT) for a given absolute frame number.
-        func stateAt(_ f: Double) -> (String, Double) {
-            var acc = 0.0
-            for s in steps {
-                if f < acc + s.dur { return (s.name, (f - acc) / max(s.dur, 1)) }
-                acc += s.dur
-            }
-            return ("done", 1)
+        .characterPhotoFlow(isPresented: $showingPhotoPicker) { newSkin in
+            customSkins.append(newSkin)
+            selectedSkin = newSkin
+            scene.setCharacter(newSkin)
         }
-
-        let start = Date()
-        let t = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { tmr in
-            let frame = Date().timeIntervalSince(start) * 60.0
-
-            // Cycle complete
-            if frame > total + 6 {
-                tmr.invalidate()
-                charY = 0; scaleX = 1; scaleY = 1; phase = "idle"
-                if looping {
-                    jumpCount += 1
-                    // Brief pause between loops for readability
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-                        if animating { runCycle() }
-                    }
-                } else {
-                    animating = false
-                }
-                return
-            }
-
-            let (ph, tv) = stateAt(frame)
-            phase = ph
-            let et = ease(min(tv, 1))
-            var y = 0.0, sx = 1.0, sy = 1.0
-
-            switch ph {
-            case "squat":
-                // Compress vertically, expand horizontally (volume preservation)
-                sy = lerp(1, p.squatScale, et)
-                sx = lerp(1, 1/p.squatScale, et)
-
-            case "launch":
-                // Transition from squat compression to launch stretch
-                sy = lerp(p.squatScale, p.launchScale, et)
-                sx = lerp(1/p.squatScale, 1/p.launchScale, et)
-                y  = lerp(0, 5, et)   // small initial lift
-
-            case "ascent":
-                // Rise to apex; stretch relaxes back to neutral as velocity slows
-                y  = lerp(5, scaledHeight, et)
-                sy = lerp(p.launchScale, 1, et)
-                sx = lerp(1/p.launchScale, 1, et)
-
-            case "apex":
-                // Hold at peak height, neutral scale
-                y = scaledHeight
-
-            case "float":
-                // Hover at peak — character hangs in the air before descending
-                y = scaledHeight
-
-            case "descent":
-                // Asymmetric gravity: pow(t, 1/fallMult) bows the easing curve
-                // so higher fallMult = faster initial drop.
-                let de = p.features.asymGrav ? pow(tv, 1/p.fallMult) : et
-                y  = lerp(scaledHeight, 5, de)
-                // Slight downward stretch during fall
-                let str = 1 + (p.launchScale - 1) * 0.5
-                sy = lerp(1, str, tv * 0.4)
-                sx = lerp(1, 1/str,  tv * 0.4)
-
-            case "land":
-                // Snap to ground, begin impact squash
-                y  = lerp(5, 0, et)
-                sy = lerp(1, p.landScale, et)
-                sx = lerp(1, 1/p.landScale, et)
-
-            case "landing":
-                // Hold squash then spring back to neutral
-                sy = lerp(p.landScale, 1, et)
-                sx = lerp(1/p.landScale, 1, et)
-
-            default: break
-            }
-
-            charY = CGFloat(y); scaleX = CGFloat(sx); scaleY = CGFloat(sy)
+        .onChange(of: params) {
+            scene.params = params
         }
-        jumpTimer = t
+        .onChange(of: jumpTrigger) {
+            animating = true
+            scene.triggerJump()
+        }
+    }
+}
+
+// MARK: - Skin chip
+
+private struct SkinChip: View {
+    let skin: CharacterSkin
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(skin.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(isSelected ? .black : .white.opacity(0.75))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isSelected ? Color.white.opacity(0.90) : Color.white.opacity(0.12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(isSelected ? Color.white : Color.white.opacity(0.25),
+                                        lineWidth: 1)
+                        )
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
 
