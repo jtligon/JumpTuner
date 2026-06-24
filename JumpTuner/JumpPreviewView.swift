@@ -198,14 +198,15 @@ struct JumpPreviewView: View {
         // a duration in frames at 60fps.
         struct PhaseStep { let name: String; let dur: Double }
         let steps: [PhaseStep] = [
-            .init(name: "squat",   dur: p.squatFrames),   // anticipation crouch
-            .init(name: "launch",  dur: 2),                // leaving the ground
-            .init(name: "ascent",  dur: p.ascentFrames),  // rising arc
-            .init(name: "apex",    dur: p.apexFrames),    // float at peak
-            .init(name: "descent", dur: p.descentFrames), // falling arc
-            .init(name: "land",    dur: 2),                // ground contact
-            .init(name: "landing", dur: p.landingFrames), // impact squash hold
-            .init(name: "recover", dur: 4),                // return to idle
+            .init(name: "squat",   dur: p.squatFrames),                            // anticipation crouch
+            .init(name: "launch",  dur: 2),                                         // leaving the ground
+            .init(name: "ascent",  dur: p.ascentFrames),                           // rising arc
+            .init(name: "apex",    dur: p.apexFrames),                             // brief peak pause
+            .init(name: "float",   dur: p.features.floating ? p.floatFrames : 0), // hover at peak
+            .init(name: "descent", dur: p.descentFrames),                          // falling arc
+            .init(name: "land",    dur: 2),                                         // ground contact
+            .init(name: "landing", dur: p.landingFrames),                          // impact squash hold
+            .init(name: "recover", dur: 4),                                         // return to idle
         ]
         let total = steps.reduce(0.0) { $0 + $1.dur }
 
@@ -270,6 +271,10 @@ struct JumpPreviewView: View {
 
             case "apex":
                 // Hold at peak height, neutral scale
+                y = scaledHeight
+
+            case "float":
+                // Hover at peak — character hangs in the air before descending
                 y = scaledHeight
 
             case "descent":
