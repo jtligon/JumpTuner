@@ -57,6 +57,10 @@ struct ParamsEditorView: View {
                               color: SectionTheme.feel)
                 LabeledSlider(label: "Apex grav factor",     value: $params.apexGravFactor,
                               range: 0.1...1.0, step: 0.05, decimals: 2, color: SectionTheme.feel)
+                LabeledToggle(label: "Floating",             value: $params.features.floating,
+                              color: SectionTheme.feel)
+                LabeledSlider(label: "Float frames",         value: $params.floatFrames,
+                              range: 0...30, step: 1, decimals: 0, color: SectionTheme.feel)
             }
         }
     }

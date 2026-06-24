@@ -2,6 +2,7 @@
 // Tests for the floating mechanic: JumpFeatures.floating and JumpParams.floatFrames.
 
 import Testing
+import Foundation
 @testable import JumpTuner
 
 @Suite("Floating mechanic")

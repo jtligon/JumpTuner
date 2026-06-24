@@ -38,6 +38,11 @@ struct JumpFeatures: Codable, Equatable {
     /// "float" that gives players more control at the highest point.
     /// Controlled by `JumpParams.apexGravFactor`.
     var apexGrav: Bool = true
+
+    /// Inserts a hover phase after the apex where the character floats at
+    /// peak height before beginning descent. Duration controlled by
+    /// `JumpParams.floatFrames`.
+    var floating: Bool = false
 }
 
 // MARK: - JumpParams
@@ -123,6 +128,10 @@ struct JumpParams: Codable, Equatable {
     /// Requires `features.apexGrav`. Range: 0.1–1.0.
     var apexGravFactor: Double = 0.40
 
+    /// Frames the character hovers at peak height after the apex.
+    /// Requires `features.floating`. Range: 0–30.
+    var floatFrames: Double = 10
+
     /// The five boolean feel toggles.
     var features: JumpFeatures = JumpFeatures()
 
@@ -149,12 +158,14 @@ struct JumpParams: Codable, Equatable {
             bufferFrames:   Double(Int.random(in: 1...8)),
             fallMult:       Double(Int.random(in: 10...28)) / 10.0,
             apexGravFactor: Double(Int.random(in: 2...18)) / 20.0,
+            floatFrames:    Double(Int.random(in: 0...30)),
             features: JumpFeatures(
                 coyoteTime:   Bool.random(),
                 jumpBuffer:   Bool.random(),
                 variableJump: Bool.random(),
                 asymGrav:     Bool.random(),
-                apexGrav:     Bool.random()
+                apexGrav:     Bool.random(),
+                floating:     Bool.random()
             )
         )
     }
