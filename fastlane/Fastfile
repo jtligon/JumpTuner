@@ -19,8 +19,9 @@ platform :ios do
   desc "Build and test on simulator"
   lane :test do
     run_tests(
-      scheme: "JumpTuner",
-      destination: "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro"
+      scheme:         "JumpTuner",
+      destination:    "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro",
+      result_bundle:  true
     )
   end
 
