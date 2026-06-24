@@ -30,7 +30,7 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <TestPlans>
          <TestPlanReference
-            reference = "container:JumpTuner.xctestplan"
+            reference = "container:JumpTunerTests/JumpTuner.xctestplan"
             default = "YES">
          </TestPlanReference>
       </TestPlans>
