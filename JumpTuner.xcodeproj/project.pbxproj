@@ -99,7 +99,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7C21C7E62F9D9BFA0002AF98 /* Build configuration list for PBXNativeTarget "JumpTuner" */;
 			buildPhases = (
-				7C5C832A2FD75F0600FEFFE7 /* ShellScript */,
 				7C21C7D72F9D9BF60002AF98 /* Sources */,
 				7C21C7D82F9D9BF60002AF98 /* Frameworks */,
 				7C21C7D92F9D9BF60002AF98 /* Resources */,
@@ -200,25 +199,6 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		7C5C832A2FD75F0600FEFFE7 /* ShellScript */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "BUILD_NUMBER=$(git -C \"$SRCROOT\" rev-list --count HEAD)\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $BUILD_NUMBER\" \"$INFOPLIST_FILE\" 2>/dev/null || /usr/libexec/PlistBuddy -c \"Add :CFBundleVersion string $BUILD_NUMBER\" \"$INFOPLIST_FILE\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		7C21C7D72F9D9BF60002AF98 /* Sources */ = {
@@ -386,7 +366,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -422,7 +402,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
