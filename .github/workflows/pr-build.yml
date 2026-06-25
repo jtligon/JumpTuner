@@ -11,19 +11,33 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      - name: Check secrets configured
+        id: secrets
+        env:
+          CONFIGURED: ${{ secrets.DIST_CERTIFICATE_BASE64 != '' && secrets.ASC_KEY_ID != '' }}
+        run: |
+          echo "configured=$CONFIGURED" >> "$GITHUB_OUTPUT"
+          if [ "$CONFIGURED" != "true" ]; then
+            echo "::notice::TestFlight secrets not configured — skipping build. See PR description for setup instructions."
+          fi
+
       - name: Checkout
+        if: steps.secrets.outputs.configured == 'true'
         uses: actions/checkout@v4
 
       - name: Select Xcode 26
+        if: steps.secrets.outputs.configured == 'true'
         run: sudo xcode-select -s $(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
 
       - name: Set up Ruby
+        if: steps.secrets.outputs.configured == 'true'
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
           bundler-cache: true
 
       - name: Import distribution certificate
+        if: steps.secrets.outputs.configured == 'true'
         env:
           DIST_CERTIFICATE_BASE64: ${{ secrets.DIST_CERTIFICATE_BASE64 }}
           DIST_CERTIFICATE_PASSWORD: ${{ secrets.DIST_CERTIFICATE_PASSWORD }}
@@ -43,6 +57,7 @@ jobs:
           rm /tmp/dist_cert.p12
 
       - name: Build and upload to TestFlight
+        if: steps.secrets.outputs.configured == 'true'
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -53,7 +68,7 @@ jobs:
         run: bundle exec fastlane pr_beta
 
       - name: Comment on PR
-        if: success()
+        if: steps.secrets.outputs.configured == 'true' && success()
         uses: actions/github-script@v7
         with:
           script: |
