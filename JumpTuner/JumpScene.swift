@@ -62,7 +62,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         phase = .idle
         isLooping = false
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
-        character.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
+        character.position = CGPoint(x: characterX, y: characterRestY)
         character.physicsBody?.velocity = .zero
         character.xScale = 1
         character.yScale = 1
@@ -99,11 +99,12 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupGround() {
-        groundY = 36   // ground line y position — raised slightly for the taller character
+        groundY = 36
         groundNode = SKNode()
         groundNode.position = CGPoint(x: size.width / 2, y: groundY)
 
-        let body = SKPhysicsBody(rectangleOf: CGSize(width: max(size.width * 2, 750), height: 4))
+        // Ground body is 8 pts tall so the character rests clearly on top of it.
+        let body = SKPhysicsBody(rectangleOf: CGSize(width: max(size.width * 2, 750), height: 8))
         body.isDynamic = false
         body.categoryBitMask    = Self.groundMask
         body.contactTestBitMask = Self.characterMask
@@ -122,19 +123,25 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         // Physics carrier — invisible, sized to match the robot body (not the full 48pt height
         // including antenna, which shouldn't collide).
         character = SKNode()
-        character.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
+        // Start character with its bottom 2 pts above the ground body top so the
+        // physics engine doesn't apply a collision-resolution impulse at scene start
+        // (which would cause the character to drift upward indefinitely under zero gravity).
+        let groundBodyHalfH: CGFloat = 4   // half of the 8-pt ground body
+        character.position = CGPoint(x: characterX,
+                                     y: groundY + groundBodyHalfH + characterSize.height / 2 + 2)
 
         let body = SKPhysicsBody(rectangleOf: characterSize)
-        body.isDynamic            = true
-        body.allowsRotation       = false
-        body.restitution          = 0
-        body.friction             = 0
-        body.linearDamping        = 0
-        body.angularDamping       = 0
-        body.categoryBitMask      = Self.characterMask
-        body.contactTestBitMask   = Self.groundMask
-        body.collisionBitMask     = Self.groundMask
-        character.physicsBody     = body
+        body.isDynamic                  = true
+        body.allowsRotation             = false
+        body.restitution                = 0
+        body.friction                   = 0
+        body.linearDamping              = 0
+        body.angularDamping             = 0
+        body.usesPreciseCollisionDetection = true   // prevent tunneling on fast descent
+        body.categoryBitMask            = Self.characterMask
+        body.contactTestBitMask         = Self.groundMask
+        body.collisionBitMask           = Self.groundMask
+        character.physicsBody           = body
 
         // Character visual: feet at y=0 in character-local → offset so feet sit on ground line.
         let defaultNode = RobotNode()
@@ -162,13 +169,14 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     private func repositionNodes() {
         groundNode?.position = CGPoint(x: size.width / 2, y: groundY)
         if phase == .idle {
-            character?.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
+            character?.position = CGPoint(x: characterX, y: characterRestY)
         } else {
             character?.position.x = characterX
         }
     }
 
     private var characterX: CGFloat { size.width * 0.3 }
+    private var characterRestY: CGFloat { groundY + 4 + characterSize.height / 2 + 2 }
 
     // MARK: - Jump cycle
 
@@ -199,7 +207,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         character.xScale = 1
         character.yScale = 1
         character.physicsBody?.velocity = .zero
-        character.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
+        character.position = CGPoint(x: characterX, y: characterRestY)
         phase = .idle
         isOnGround = true
         startJump()
@@ -220,10 +228,17 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
                 characterNode.setPhase(.apex)
                 if config.apexDuration > 0 {
                     physicsWorld.gravity = CGVector(dx: 0, dy: -config.apexGravity)
-                    run(.sequence([.wait(forDuration: config.apexDuration)])) { [weak self] in
-                        self?.phase = .descending
-                        self?.characterNode.setPhase(.descending)
-                    }
+                    // Run on character (not scene) so removeAllActions() in restartJump
+                    // cancels this too, preventing a stale transition from corrupting phase.
+                    let apexWait = SKAction.sequence([
+                        .wait(forDuration: config.apexDuration),
+                        .run { [weak self] in
+                            guard let self, self.phase == .apex else { return }
+                            self.phase = .descending
+                            self.characterNode.setPhase(.descending)
+                        }
+                    ])
+                    character.run(apexWait, withKey: "apexWait")
                 } else {
                     phase = .descending
                     characterNode.setPhase(.descending)
@@ -243,7 +258,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     func didBegin(_ contact: SKPhysicsContact) {
         let masks = contact.bodyA.categoryBitMask | contact.bodyB.categoryBitMask
         guard masks == (Self.characterMask | Self.groundMask) else { return }
-        guard phase == .descending else { return }
+        guard phase == .descending || phase == .apex else { return }
 
         isOnGround = true
         phase = .landing
