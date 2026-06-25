@@ -12,7 +12,9 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
 
     // MARK: - Nodes
 
-    private var character: SKSpriteNode!
+    // Invisible physics carrier — the active CharacterNode is its child.
+    private var character: SKNode!
+    private var characterNode: (any CharacterNode)!
     private var groundNode: SKNode!
 
     // MARK: - State
@@ -24,8 +26,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     private var phase: JumpPhase = .idle
     private var isOnGround: Bool = true
     private var groundY: CGFloat = 0
-    private let characterSize = CGSize(width: 44, height: 44)
-    private let groundHeight: CGFloat = 3
+    private let characterSize = CGSize(width: 36, height: 48)
 
     // MARK: - Scene setup
 
@@ -57,12 +58,24 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     }
 
     func stopJumping() {
+        character.removeAllActions()
         phase = .idle
         isLooping = false
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
-        character?.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
-        character?.physicsBody?.velocity = .zero
-        character?.setScale(1)
+        character.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
+        character.physicsBody?.velocity = .zero
+        character.xScale = 1
+        character.yScale = 1
+        characterNode.setPhase(.idle)
+    }
+
+    func setCharacter(_ skin: CharacterSkin) {
+        characterNode?.removeFromParent()
+        let newNode = skin.make()
+        newNode.position = CGPoint(x: 0, y: -characterSize.height / 2)
+        character.addChild(newNode)
+        characterNode = newNode
+        characterNode.setPhase(phase)
     }
 
     // MARK: - Setup helpers
@@ -78,7 +91,6 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
                 x: CGFloat.random(in: 0...max(size.width, 1)),
                 y: CGFloat.random(in: size.height * 0.1...size.height)
             )
-            // Slow right-to-left scroll via a repeating action
             let travel = SKAction.moveBy(x: -max(size.width, 375), y: 0, duration: Double.random(in: 12...20))
             let reset  = SKAction.moveBy(x:  max(size.width, 375), y: 0, duration: 0)
             star.run(.repeatForever(.sequence([travel, reset])))
@@ -87,7 +99,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupGround() {
-        groundY = 31   // ground line y position
+        groundY = 36   // ground line y position — raised slightly for the taller character
         groundNode = SKNode()
         groundNode.position = CGPoint(x: size.width / 2, y: groundY)
 
@@ -98,7 +110,6 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         body.collisionBitMask   = Self.characterMask
         groundNode.physicsBody = body
 
-        // Visual ground line
         let line = SKShapeNode(rectOf: CGSize(width: max(size.width, 375), height: 3))
         line.fillColor = UIColor(red: 0.4, green: 0.5, blue: 0.6, alpha: 1)
         line.strokeColor = .clear
@@ -108,7 +119,9 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     }
 
     private func setupCharacter() {
-        character = SKSpriteNode(color: UIColor(red: 0.9, green: 0.9, blue: 1.0, alpha: 1), size: characterSize)
+        // Physics carrier — invisible, sized to match the robot body (not the full 48pt height
+        // including antenna, which shouldn't collide).
+        character = SKNode()
         character.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
 
         let body = SKPhysicsBody(rectangleOf: characterSize)
@@ -122,6 +135,12 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         body.contactTestBitMask   = Self.groundMask
         body.collisionBitMask     = Self.groundMask
         character.physicsBody     = body
+
+        // Character visual: feet at y=0 in character-local → offset so feet sit on ground line.
+        let defaultNode = RobotNode()
+        defaultNode.position = CGPoint(x: 0, y: -characterSize.height / 2)
+        character.addChild(defaultNode)
+        characterNode = defaultNode
 
         addChild(character)
     }
@@ -156,6 +175,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
     private func startJump() {
         guard let body = character.physicsBody else { return }
         phase = .squat
+        characterNode.setPhase(.squat)
 
         let squatAction = SKAction.group([
             SKAction.scaleX(to: config.squatScaleX, duration: config.squatDuration),
@@ -170,12 +190,14 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             guard let self else { return }
             body.velocity = CGVector(dx: 0, dy: self.config.jumpImpulse)
             self.phase = .ascending
+            self.characterNode.setPhase(.ascending)
         }
     }
 
     private func restartJump() {
         character.removeAllActions()
-        character.setScale(1)
+        character.xScale = 1
+        character.yScale = 1
         character.physicsBody?.velocity = .zero
         character.position = CGPoint(x: characterX, y: groundY + characterSize.height / 2)
         phase = .idle
@@ -195,13 +217,16 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             physicsWorld.gravity = CGVector(dx: 0, dy: -config.ascentGravity)
             if vy <= 0 {
                 phase = .apex
+                characterNode.setPhase(.apex)
                 if config.apexDuration > 0 {
                     physicsWorld.gravity = CGVector(dx: 0, dy: -config.apexGravity)
                     run(.sequence([.wait(forDuration: config.apexDuration)])) { [weak self] in
                         self?.phase = .descending
+                        self?.characterNode.setPhase(.descending)
                     }
                 } else {
                     phase = .descending
+                    characterNode.setPhase(.descending)
                 }
             }
         case .apex:
@@ -222,6 +247,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
 
         isOnGround = true
         phase = .landing
+        characterNode.setPhase(.landing)
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         character.physicsBody?.velocity = .zero
 
@@ -237,6 +263,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         character.run(.sequence([squash, recover])) { [weak self] in
             guard let self else { return }
             self.phase = .idle
+            self.characterNode.setPhase(.idle)
             if self.isLooping {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                     self.startJump()
@@ -244,10 +271,4 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             }
         }
     }
-}
-
-// MARK: - Jump phase
-
-private enum JumpPhase: Equatable {
-    case idle, squat, ascending, apex, descending, landing
 }
