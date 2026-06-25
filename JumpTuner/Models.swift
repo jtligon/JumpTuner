@@ -192,6 +192,36 @@ struct JumpParams: Codable, Equatable {
     }
 }
 
+// MARK: - SkyProgress
+
+/// Maps a jump loop count to how many sky elements are visible.
+///
+/// As the user completes more jump loops, the starfield grows denser and
+/// planets appear — rewarding continued exploration of the jump tuner.
+///
+/// All logic is pure and synchronous so it can be tested without UI.
+struct SkyProgress {
+    static let maxStars   = 90
+    static let maxPlanets = 3
+
+    private static let starBaseline   = 45
+    private static let planetStart    = 10  // first planet appears after this many jumps
+    private static let planetInterval = 15  // one new planet every N jumps after start
+
+    let jumpCount: Int
+
+    /// Number of stars that should be visible (45 baseline, grows to maxStars).
+    var visibleStars: Int {
+        min(Self.starBaseline + jumpCount, Self.maxStars)
+    }
+
+    /// Number of planets that should be visible (0 until jumpCount >= planetStart).
+    var visiblePlanets: Int {
+        guard jumpCount >= Self.planetStart else { return 0 }
+        return min((jumpCount - Self.planetStart) / Self.planetInterval + 1, Self.maxPlanets)
+    }
+}
+
 // MARK: - Preset
 
 /// A named snapshot of a `JumpParams` configuration.
