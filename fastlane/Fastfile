@@ -62,11 +62,10 @@ platform :ios do
     )
 
     build_app(
-      scheme:                "JumpTuner",
-      export_method:         "app-store",
-      code_signing_identity: "Apple Distribution",
+      scheme:                 "JumpTuner",
+      export_method:          "app-store",
+      codesigning_identity:   "Apple Distribution",
       export_options: {
-        method:               "app-store",
         signingStyle:         "manual",
         provisioningProfiles: { "visceralorigami.JumpTuner" => "JumpTunerDist" }
       }
