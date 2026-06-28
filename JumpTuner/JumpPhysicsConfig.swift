@@ -72,7 +72,8 @@ struct JumpPhysicsConfig {
             : CGFloat(g)
 
         squatDuration   = params.squatFrames   / 60.0
-        apexDuration    = params.apexFrames    / 60.0
+        let floatFrames  = params.features.floating ? params.floatFrames : 0
+        apexDuration    = (params.apexFrames + floatFrames) / 60.0
         landingDuration = params.landingFrames / 60.0
 
         squatScaleY  = CGFloat(params.squatScale)
