@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
     types: [ opened, synchronize, reopened ]
 
+permissions:
+  pull-requests: write
+
 jobs:
   testflight:
     name: Upload PR Build to TestFlight
@@ -33,20 +36,24 @@ jobs:
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
 
           echo "$DIST_CERTIFICATE_BASE64" | base64 --decode > /tmp/dist_cert.p12
           security import /tmp/dist_cert.p12 -k build.keychain \
             -P "$DIST_CERTIFICATE_PASSWORD" \
             -T /usr/bin/codesign -T /usr/bin/productbuild
-          security set-key-partition-list -S apple-tool:,apple: -s \
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
             -k "$KEYCHAIN_PASSWORD" build.keychain
           rm /tmp/dist_cert.p12
+          echo "=== Certificates in keychain ==="
+          security find-identity -v -p codesigning build.keychain
 
       - name: Build and upload to TestFlight
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: '120'
