@@ -59,13 +59,14 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
 
     func stopJumping() {
         character.removeAllActions()
+        characterNode.removeAllActions()
         phase = .idle
         isLooping = false
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         character.position = CGPoint(x: characterX, y: characterRestY)
         character.physicsBody?.velocity = .zero
-        character.xScale = 1
-        character.yScale = 1
+        characterNode.xScale = 1
+        characterNode.yScale = 1
         characterNode.setPhase(.idle)
     }
 
@@ -185,6 +186,9 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         phase = .squat
         characterNode.setPhase(.squat)
 
+        // Scale the visual node only — the physics carrier stays at scale 1 so the
+        // physics body never overlaps the ground during launch stretch.
+        let visual = characterNode as SKNode
         let squatAction = SKAction.group([
             SKAction.scaleX(to: config.squatScaleX, duration: config.squatDuration),
             SKAction.scaleY(to: config.squatScaleY, duration: config.squatDuration)
@@ -193,9 +197,14 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             SKAction.scaleX(to: config.launchScaleX, duration: 2.0/60.0),
             SKAction.scaleY(to: config.launchScaleY, duration: 2.0/60.0)
         ])
+        let resetScale = SKAction.group([
+            SKAction.scaleX(to: 1, duration: 0),
+            SKAction.scaleY(to: 1, duration: 0)
+        ])
 
-        character.run(.sequence([squatAction, launchAction])) { [weak self] in
+        visual.run(.sequence([squatAction, launchAction])) { [weak self] in
             guard let self else { return }
+            visual.run(resetScale)
             body.velocity = CGVector(dx: 0, dy: self.config.jumpImpulse)
             self.phase = .ascending
             self.characterNode.setPhase(.ascending)
@@ -204,8 +213,9 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
 
     private func restartJump() {
         character.removeAllActions()
-        character.xScale = 1
-        character.yScale = 1
+        characterNode.removeAllActions()
+        characterNode.xScale = 1
+        characterNode.yScale = 1
         character.physicsBody?.velocity = .zero
         character.position = CGPoint(x: characterX, y: characterRestY)
         phase = .idle
@@ -266,6 +276,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
         physicsWorld.gravity = CGVector(dx: 0, dy: 0)
         character.physicsBody?.velocity = .zero
 
+        let visual = characterNode as SKNode
         let squash = SKAction.group([
             SKAction.scaleX(to: config.landScaleX, duration: 2.0/60.0),
             SKAction.scaleY(to: config.landScaleY, duration: 2.0/60.0)
@@ -275,7 +286,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             SKAction.scaleY(to: 1, duration: config.landingDuration)
         ])
 
-        character.run(.sequence([squash, recover])) { [weak self] in
+        visual.run(.sequence([squash, recover])) { [weak self] in
             guard let self else { return }
             self.phase = .idle
             self.characterNode.setPhase(.idle)
