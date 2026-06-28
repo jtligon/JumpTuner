@@ -8,13 +8,16 @@ A SwiftUI iOS app for prototyping, previewing, and sharing platformer jump feel 
 
 ## What it does
 
-JumpTuner gives game designers and developers a tactile way to tune the 13 numeric parameters and 5 boolean flags that define how a platformer character jumps. A robot character previews the jump in real time as you move sliders. Presets can be saved, loaded, and shared as QR codes.
+JumpTuner gives game designers and developers a tactile way to tune the 15 numeric parameters and 7 boolean flags that define how a platformer character jumps. A character previews the jump in real time as you move sliders. Presets can be saved, loaded, and shared as QR codes.
 
 ## Features
 
-- **Full-screen animated preview** — see your jump arc immediately as you adjust sliders
-- **13 tunable parameters** — timing, height, squash & stretch, and game-feel tricks
-- **5 feel toggles** — coyote time, jump buffering, variable height, asymmetric gravity, apex float
+- **SpriteKit-powered preview** — 60fps physics-accurate jump arc, rendered in a SpriteKit scene
+- **Character picker** — choose from Robot, Rabbit, or Pirate; or import any photo as a custom skin
+- **15 tunable parameters** — timing, height, squash & stretch, and game-feel tricks
+- **7 feel toggles** — coyote time, jump buffering, variable height, asymmetric gravity, apex float, floating hover, rubber bounce
+- **Stepper buttons** — `-- / - / value / + / ++` buttons on every slider for precise increments alongside coarse drag
+- **Sky progress** — stars and planets accumulate in the background as your jump count grows
 - **Randomize / reset** — dice button for inspiration, reset button to return to defaults
 - **Loop mode** — repeat the jump cycle continuously to evaluate feel over time
 - **Preset system** — name and save configurations, load or delete them
@@ -25,7 +28,7 @@ JumpTuner gives game designers and developers a tactile way to tune the 13 numer
 
 - Xcode 15+
 - iOS 16+ deployment target
-- No third-party dependencies (CoreImage handles QR generation)
+- No third-party dependencies (CoreImage handles QR generation, SpriteKit is system-provided)
 
 ## Setup
 
@@ -43,11 +46,20 @@ JumpTuner gives game designers and developers a tactile way to tune the 13 numer
 |---|---|
 | `JumpTunerApp.swift` | `@main` entry point |
 | `Theme.swift` | Color constants and section accent colors |
-| `Models.swift` | `JumpFeatures`, `JumpParams`, `Preset` data structures |
+| `Models.swift` | `JumpFeatures`, `JumpParams`, `Preset`, `SkyProgress` data structures |
 | `PresetStore.swift` | JSON persistence, `ObservableObject` preset list |
-| `Components.swift` | `LabeledSlider`, `LabeledToggle`, `CollapsibleSection`, `ControllerButton` |
-| `RobotView.swift` | Robot character with phase-driven arm/eye expressions |
-| `JumpPreviewView.swift` | Full-screen preview, star background, 60fps animation engine |
+| `Components.swift` | `LabeledSlider` (with stepper buttons), `LabeledToggle`, `CollapsibleSection`, `ControllerButton` |
+| `JumpPhase.swift` | `JumpPhase` enum used to drive character expressions |
+| `JumpPhysicsConfig.swift` | Maps `JumpParams` to concrete SpriteKit durations and scale values |
+| `JumpScene.swift` | `SKScene` subclass — owns the animation loop via `SKAction` sequences |
+| `JumpPreviewView.swift` | SwiftUI wrapper: `SpriteView` + play/loop controls + character picker overlay |
+| `CharacterSkin.swift` | `CharacterSkin` enum (robot, rabbit, pirate, custom photo) + factory |
+| `RobotNode.swift` | SpriteKit robot character node with phase-driven expressions |
+| `RabbitNode.swift` | SpriteKit rabbit character node |
+| `PirateNode.swift` | SpriteKit pirate character node |
+| `GeneratedCharacterNode.swift` | SpriteKit node that renders a user-supplied photo as a character |
+| `CharacterPhotoFlow.swift` | Photo picker sheet + image processing for custom skins |
+| `RobotView.swift` | Legacy SwiftUI robot (used in Xcode previews) |
 | `ParamsEditorView.swift` | All four collapsible slider/toggle sections |
 | `PresetsView.swift` | Save / load / delete / QR preset UI |
 | `ContentView.swift` | Root layout, side drawer, glues everything together |
@@ -58,7 +70,7 @@ JumpTuner gives game designers and developers a tactile way to tune the 13 numer
 
 1. Add the property to `JumpParams` in `Models.swift` with a default value
 2. Add a `LabeledSlider` or `LabeledToggle` row in `ParamsEditorView.swift`
-3. Use the value in `JumpPreviewView.swift`'s `runCycle()` switch statement
+3. Consume the value in `JumpPhysicsConfig.swift` (derive a physics constant) and/or in `JumpScene.swift`'s `runJumpSequence()` (add or modify an `SKAction` step)
 4. Add an entry to the appropriate `HelpSection` in `HelpView.swift`
 5. Update `JumpParams.randomized()` if the parameter should be randomizable
 
@@ -85,12 +97,16 @@ Presets are encoded as JSON:
     "bufferFrames": 4,
     "fallMult": 1.6,
     "apexGravFactor": 0.4,
+    "floatFrames": 10,
+    "bounceCount": 2,
     "features": {
       "coyoteTime": true,
       "jumpBuffer": true,
       "variableJump": true,
       "asymGrav": true,
-      "apexGrav": true
+      "apexGrav": true,
+      "floating": false,
+      "rubberBounce": false
     }
   }
 }
@@ -103,6 +119,5 @@ Scan the QR code with any reader, copy the JSON, and paste it into the Import ta
 - Camera-based QR scanning (AVFoundation) to replace paste import
 - `NSPersistentCloudKitContainer` for iCloud sync if preset library grows large
 - Haptic feedback on landing
-- Multiple characters / skins
 - Export parameters as Swift / GDScript / C# code snippets
 - Apple Watch companion for quick preset recall
