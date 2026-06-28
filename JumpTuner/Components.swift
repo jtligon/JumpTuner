@@ -32,7 +32,7 @@ struct LabeledSlider: View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 10) {
                 Text(label)
-                    .font(.system(size: 23))
+                    .font(.system(size: 18))
                     .foregroundColor(.secondary)
                     .frame(width: 160, alignment: .leading)
                 Slider(value: $value, in: range, step: step)
@@ -46,7 +46,7 @@ struct LabeledSlider: View {
                 }
                 NudgeButton("-", color: color) { nudge(by: -step) }
                 Text(formattedValue)
-                    .font(.system(size: 23, weight: .medium))
+                    .font(.system(size: 18, weight: .medium))
                     .monospacedDigit()
                     .foregroundColor(color)
                     .frame(minWidth: 38, alignment: .center)
@@ -75,7 +75,7 @@ private struct NudgeButton: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundColor(color)
                 .frame(width: 30, height: 24)
                 .background(color.opacity(0.12))
@@ -94,7 +94,7 @@ struct LabeledToggle: View {
 
     var body: some View {
         Toggle(label, isOn: $value)
-            .font(.system(size: 23))
+            .font(.system(size: 18))
             .foregroundColor(.secondary)
             .tint(color)
             .padding(.horizontal, 16)
