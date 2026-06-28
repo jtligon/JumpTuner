@@ -188,6 +188,8 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
 
         // Scale the visual node only — the physics carrier stays at scale 1 so the
         // physics body never overlaps the ground during launch stretch.
+        // Use SKAction.run inside the sequence (not a completion closure) so that
+        // removeAllActions() cancels the whole thing cleanly with no side effects.
         let visual = characterNode as SKNode
         let squatAction = SKAction.group([
             SKAction.scaleX(to: config.squatScaleX, duration: config.squatDuration),
@@ -201,14 +203,14 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             SKAction.scaleX(to: 1, duration: 0),
             SKAction.scaleY(to: 1, duration: 0)
         ])
-
-        visual.run(.sequence([squatAction, launchAction])) { [weak self] in
-            guard let self else { return }
-            visual.run(resetScale)
+        let doLaunch = SKAction.run { [weak self] in
+            guard let self, self.phase == .squat else { return }
             body.velocity = CGVector(dx: 0, dy: self.config.jumpImpulse)
             self.phase = .ascending
             self.characterNode.setPhase(.ascending)
         }
+
+        visual.run(.sequence([squatAction, launchAction, resetScale, doLaunch]))
     }
 
     private func restartJump() {
@@ -285,9 +287,8 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
             SKAction.scaleX(to: 1, duration: config.landingDuration),
             SKAction.scaleY(to: 1, duration: config.landingDuration)
         ])
-
-        visual.run(.sequence([squash, recover])) { [weak self] in
-            guard let self else { return }
+        let doLand = SKAction.run { [weak self] in
+            guard let self, self.phase == .landing else { return }
             self.phase = .idle
             self.characterNode.setPhase(.idle)
             if self.isLooping {
@@ -296,5 +297,7 @@ final class JumpScene: SKScene, SKPhysicsContactDelegate {
                 }
             }
         }
+
+        visual.run(.sequence([squash, recover, doLand]))
     }
 }
