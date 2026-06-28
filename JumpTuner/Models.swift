@@ -43,6 +43,12 @@ struct JumpFeatures: Codable, Equatable {
     /// peak height before beginning descent. Duration controlled by
     /// `JumpParams.floatFrames`.
     var floating: Bool = false
+
+    /// After the main landing, the character bounces back up to 25% of the
+    /// original jump height, then 25% of that, and so on. Each successive
+    /// landing squashes less. Number of bounces controlled by
+    /// `JumpParams.bounceCount`.
+    var rubberBounce: Bool = false
 }
 
 // MARK: - JumpParams
@@ -132,6 +138,11 @@ struct JumpParams: Codable, Equatable {
     /// Requires `features.floating`. Range: 0–30.
     var floatFrames: Double = 10
 
+    /// Number of rubber bounces after the main landing.
+    /// Each bounce rises to 25% of the previous height and squashes
+    /// proportionally less. Requires `features.rubberBounce`. Range: 1–6.
+    var bounceCount: Double = 2
+
     /// The five boolean feel toggles.
     var features: JumpFeatures = JumpFeatures()
 
@@ -159,13 +170,15 @@ struct JumpParams: Codable, Equatable {
             fallMult:       Double(Int.random(in: 10...28)) / 10.0,
             apexGravFactor: Double(Int.random(in: 2...18)) / 20.0,
             floatFrames:    Double(Int.random(in: 0...30)),
+            bounceCount:    Double(Int.random(in: 1...4)),
             features: JumpFeatures(
                 coyoteTime:   Bool.random(),
                 jumpBuffer:   Bool.random(),
                 variableJump: Bool.random(),
                 asymGrav:     Bool.random(),
                 apexGrav:     Bool.random(),
-                floating:     Bool.random()
+                floating:     Bool.random(),
+                rubberBounce: Bool.random()
             )
         )
     }

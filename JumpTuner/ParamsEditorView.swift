@@ -61,6 +61,10 @@ struct ParamsEditorView: View {
                               color: SectionTheme.feel)
                 LabeledSlider(label: "Float frames",         value: $params.floatFrames,
                               range: 0...30, step: 1, decimals: 0, color: SectionTheme.feel)
+                LabeledToggle(label: "Rubber bounce",        value: $params.features.rubberBounce,
+                              color: SectionTheme.feel)
+                LabeledSlider(label: "Bounce count",         value: $params.bounceCount,
+                              range: 1...6, step: 1, decimals: 0, color: SectionTheme.feel)
             }
         }
     }
