@@ -162,7 +162,7 @@ final class JumpScene: SKScene {
         let ascentDuration  = params.ascentFrames / 60.0
         let descentDuration = params.descentFrames / 60.0
 
-        let sequence = SKAction.sequence([
+        var steps: [SKAction] = [
             // Squat anticipation
             setPhase(.squat),
             scaleGroup(x: config.squatScaleX, y: config.squatScaleY, duration: config.squatDuration),
@@ -191,7 +191,38 @@ final class JumpScene: SKScene {
 
             // Recover to neutral
             scaleGroup(x: 1, y: 1, duration: config.landingDuration),
+        ]
 
+        // Rubber bounce: each bounce rises to 25% of the previous height.
+        // Duration scales with sqrt(height ratio) = 0.5^i to match natural physics.
+        // Squash on each landing is proportional to the bounce height ratio.
+        if params.features.rubberBounce {
+            let fullHeight = scaledHeight()
+            let baseDeform = 1.0 - params.landScale  // how much the main landing deforms
+
+            for i in 0..<Int(params.bounceCount) {
+                let hr = CGFloat(pow(0.25, Double(i + 1)))  // 0.25, 0.0625, …
+                let ds = Double(pow(0.5, Double(i + 1)))    // 0.5, 0.25, …  (sqrt of hr)
+                let bounceY       = restY + fullHeight * hr
+                let bAscent       = max(2.0 / 60.0, ascentDuration  * ds)
+                let bDescent      = max(2.0 / 60.0, descentDuration * ds)
+                let bLandingDur   = max(2.0 / 60.0, config.landingDuration * ds)
+                let bSquashY      = CGFloat(1.0 - baseDeform * Double(hr))
+                let bSquashX      = 1.0 / bSquashY
+
+                steps += [
+                    setPhase(.ascending),
+                    moveTo(y: bounceY, duration: bAscent,  timing: .easeOut),
+                    setPhase(.descending),
+                    moveTo(y: restY,   duration: bDescent, timing: .easeIn),
+                    setPhase(.landing),
+                    scaleGroup(x: bSquashX, y: bSquashY, duration: frameDur),
+                    scaleGroup(x: 1,        y: 1,        duration: bLandingDur),
+                ]
+            }
+        }
+
+        steps += [
             // Idle and optionally loop
             setPhase(.idle),
             .run { [weak self] in
@@ -203,8 +234,8 @@ final class JumpScene: SKScene {
                     }
                 }
             }
-        ])
+        ]
 
-        character.run(sequence, withKey: "jump")
+        character.run(.sequence(steps), withKey: "jump")
     }
 }

@@ -89,6 +89,12 @@ private let helpSections: [HelpSection] = [
             HelpItem(name: "Apex grav factor",
                      description: "The fraction of normal gravity applied at the apex. 0.1 = almost weightless. 1.0 = no effect (full gravity throughout).",
                      tip: "Requires Apex gravity reduction to be enabled."),
+            HelpItem(name: "Rubber bounce",
+                     description: "After landing, the character bounces back up to 25% of the original jump height, then 25% of that, and so on. Each successive landing squashes less as momentum dissipates.",
+                     tip: "Great for jelly-like or physics-toy characters. Keep bounce count low (2–3) for subtlety."),
+            HelpItem(name: "Bounce count",
+                     description: "How many rubber bounces occur after the main landing. Each bounce is 25% the height of the previous one, so higher counts produce progressively tinier hops.",
+                     tip: "Requires Rubber bounce to be enabled."),
         ]
     ),
 ]
