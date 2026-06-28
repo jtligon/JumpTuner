@@ -14,24 +14,74 @@ struct LabeledSlider: View {
     let decimals: Int
     var color: Color = .accentColor
 
+    private var totalSteps: Double { (range.upperBound - range.lowerBound) / step }
+    private var bigStep: Double { totalSteps > 50 ? step * 10 : step * 5 }
+    private var showBigSteppers: Bool { totalSteps > 10 }
+
+    private func nudge(by delta: Double) {
+        let raw = value + delta
+        let snapped = range.lowerBound + round((raw - range.lowerBound) / step) * step
+        value = min(range.upperBound, max(range.lowerBound, snapped))
+    }
+
+    private var formattedValue: String {
+        decimals == 0 ? "\(Int(value))" : String(format: "%.\(decimals)f", value)
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            Text(label)
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-                .frame(width: 118, alignment: .leading)
-            Slider(value: $value, in: range, step: step)
-                .tint(color)
-            Text(decimals == 0
-                 ? "\(Int(value))"
-                 : String(format: "%.\(decimals)f", value))
-                .font(.system(size: 13, weight: .medium))
-                .monospacedDigit()
-                .foregroundColor(color)
-                .frame(width: 38, alignment: .trailing)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 10) {
+                Text(label)
+                    .font(.system(size: 23))
+                    .foregroundColor(.secondary)
+                    .frame(width: 160, alignment: .leading)
+                Slider(value: $value, in: range, step: step)
+                    .tint(color)
+            }
+
+            HStack(spacing: 4) {
+                Spacer()
+                if showBigSteppers {
+                    NudgeButton("--", color: color) { nudge(by: -bigStep) }
+                }
+                NudgeButton("-", color: color) { nudge(by: -step) }
+                Text(formattedValue)
+                    .font(.system(size: 23, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundColor(color)
+                    .frame(minWidth: 38, alignment: .center)
+                NudgeButton("+", color: color) { nudge(by: step) }
+                if showBigSteppers {
+                    NudgeButton("++", color: color) { nudge(by: bigStep) }
+                }
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
+    }
+}
+
+private struct NudgeButton: View {
+    let label: String
+    let color: Color
+    let action: () -> Void
+
+    init(_ label: String, color: Color, action: @escaping () -> Void) {
+        self.label = label
+        self.color = color
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(color)
+                .frame(width: 30, height: 24)
+                .background(color.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 5))
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -44,7 +94,7 @@ struct LabeledToggle: View {
 
     var body: some View {
         Toggle(label, isOn: $value)
-            .font(.system(size: 13))
+            .font(.system(size: 23))
             .foregroundColor(.secondary)
             .tint(color)
             .padding(.horizontal, 16)
@@ -145,6 +195,9 @@ struct ControllerButton: View {
 
 #Preview("Slider") {
     VStack {
+        LabeledSlider(label: "Height (pt)", value: .constant(120),
+                      range: 10...500, step: 1, decimals: 0,
+                      color: SectionTheme.height)
         LabeledSlider(label: "Ascent frames", value: .constant(11),
                       range: 4...30, step: 1, decimals: 0,
                       color: SectionTheme.timing)
