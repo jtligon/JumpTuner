@@ -5,6 +5,9 @@ on:
     branches: [ "main" ]
     types: [ opened, synchronize, reopened ]
 
+permissions:
+  pull-requests: write
+
 jobs:
   testflight:
     name: Upload PR Build to TestFlight
