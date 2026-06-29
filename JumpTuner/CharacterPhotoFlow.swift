@@ -124,14 +124,15 @@ private struct CharacterPhotoFlowModifier: ViewModifier {
     }
 
     private func commitImage(_ image: UIImage, viaPlayground: Bool) {
-        let name = viaPlayground ? "Custom" : nameFromImage()
-        let skin = CharacterSkin.generated(image: image, name: name)
+        let name = viaPlayground ? "Custom" : "Photo"
+        // Playground output is already stylised — keep it as a simple sprite.
+        // Raw photos get the full Vision / skeletal-rig treatment.
+        let skin = viaPlayground
+            ? CharacterSkin.generated(image: image, name: name)
+            : CharacterSkin.fromPhoto(image: image, name: name)
         onSkin(skin)
         sourceImage = nil
     }
-
-    /// On simulator we show a short placeholder name so the chip is identifiable.
-    private func nameFromImage() -> String { "Photo" }
 }
 
 // MARK: - Camera picker (UIViewControllerRepresentable)
