@@ -3,12 +3,13 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var store      = PresetStore()
-    @State private var params           = JumpParams()
-    @State private var selectedQRPreset: Preset?
-    @State private var drawerOpen       = true
-    @State private var showHelp         = false
-    @State private var jumpTrigger      = 0
+    @StateObject private var store        = PresetStore()
+    @State private var params             = JumpParams()
+    @State private var selectedQRPreset:   Preset?
+    @State private var selectedCodePreset: Preset?
+    @State private var drawerOpen         = true
+    @State private var showHelp           = false
+    @State private var jumpTrigger        = 0
 
     private let drawerWidth: CGFloat = 260
 
@@ -89,7 +90,8 @@ struct ContentView: View {
                             PresetsView(
                                 store: store,
                                 params: $params,
-                                selectedQRPreset: $selectedQRPreset
+                                selectedQRPreset: $selectedQRPreset,
+                                selectedCodePreset: $selectedCodePreset
                             )
                             Spacer(minLength: 20)
                         }
@@ -106,6 +108,9 @@ struct ContentView: View {
         .ignoresSafeArea()
         .sheet(item: $selectedQRPreset) { preset in
             PresetQRView(preset: preset)
+        }
+        .sheet(item: $selectedCodePreset) { preset in
+            CodeExportView(preset: preset)
         }
         .sheet(isPresented: $showHelp) {
             HelpView()
