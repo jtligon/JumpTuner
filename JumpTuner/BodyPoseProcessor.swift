@@ -2,8 +2,8 @@
 // On-device Vision pipeline: segments the foreground subject and, when a
 // human body is detected, splits the cutout into head / torso / legs crops.
 //
-// Uses VNGeneratePersonSegmentationRequest (iOS 15+, on-device) for the mask
-// and VNDetectHumanBodyPoseRequest for joint positions. Both requests run
+// Uses VNGenerateForegroundInstanceMaskRequest (iOS 17+, any subject) for the
+// mask and VNDetectHumanBodyPoseRequest for joint positions. Both requests run
 // against the same VNImageRequestHandler in one pass.
 
 import UIKit
@@ -32,7 +32,6 @@ enum BodyPoseProcessor {
     /// Always succeeds — returns a `BodySegments` with just `cutout` if
     /// segmentation or pose detection fails.
     static func process(_ source: UIImage) async -> BodySegments {
-        // Normalize orientation so Vision sees un-rotated pixels.
         let image = source.normalized()
 
         return await withCheckedContinuation { continuation in
@@ -49,26 +48,28 @@ enum BodyPoseProcessor {
             return BodySegments(cutout: image, head: nil, torso: nil, legs: nil)
         }
 
-        let segRequest = VNGeneratePersonSegmentationRequest()
-        segRequest.qualityLevel      = .accurate
-        segRequest.outputPixelFormat = kCVPixelFormatType_OneComponent8
-
+        // VNGenerateForegroundInstanceMaskRequest works on any subject (person,
+        // animal, object) — unlike the person-only segmentation request.
+        let maskRequest = VNGenerateForegroundInstanceMaskRequest()
         let poseRequest = VNDetectHumanBodyPoseRequest()
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-        try? handler.perform([segRequest, poseRequest])
+        try? handler.perform([maskRequest, poseRequest])
 
-        // Segmentation: build clean cutout (fall back to original on failure)
+        // Build clean cutout from the foreground mask.
+        // generateScaledMaskForImage needs the same handler to access the image.
         let cutout: UIImage
-        if let pixelBuffer = segRequest.results?.first?.pixelBuffer {
-            cutout = applyMask(pixelBuffer, to: image) ?? image
+        if let observation = maskRequest.results?.first,
+           let maskBuffer  = try? observation.generateScaledMaskForImage(
+               forInstances: observation.allInstances, from: handler) {
+            cutout = applyMask(maskBuffer, to: image) ?? image
         } else {
             cutout = image
         }
 
-        // Pose: convert joints to UIKit image coordinates
-        guard let observation = poseRequest.results?.first,
-              let allJoints   = try? observation.recognizedPoints(.all),
+        // Pose: detect body joints for skeletal splitting (people only).
+        guard let poseObservation = poseRequest.results?.first,
+              let allJoints       = try? poseObservation.recognizedPoints(.all),
               !allJoints.isEmpty else {
             return BodySegments(cutout: cutout, head: nil, torso: nil, legs: nil)
         }
@@ -85,8 +86,7 @@ enum BodyPoseProcessor {
     // MARK: - Mask compositing (pure CoreGraphics — no Metal/CIContext)
 
     private static func applyMask(_ pixelBuffer: CVPixelBuffer, to image: UIImage) -> UIImage? {
-        // Copy mask bytes before releasing the lock so the CGDataProvider
-        // has a stable, owned buffer for its lifetime.
+        // Copy mask bytes before unlocking so the CGDataProvider has a stable buffer.
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         let mw  = CVPixelBufferGetWidth(pixelBuffer)
         let mh  = CVPixelBufferGetHeight(pixelBuffer)
@@ -99,7 +99,7 @@ enum BodyPoseProcessor {
         CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
 
         // Build a grayscale CGImage from the mask bytes.
-        // Vision produces white=person, black=background in OneComponent8 format.
+        // White (255) = foreground/keep, Black (0) = background/clip.
         guard let provider = CGDataProvider(data: maskData as CFData),
               let maskCG = CGImage(
                   width: mw, height: mh,
@@ -114,10 +114,8 @@ enum BodyPoseProcessor {
         let w = sourceCG.width
         let h = sourceCG.height
 
-        // Draw into RGBA context clipped by the mask.
-        // CGContext.clip(to:mask:) treats the grayscale luminosity as the clip weight:
-        //   luminosity = 1 (white/person)  → draws through → opaque foreground pixels
-        //   luminosity = 0 (black/bg)      → clips out    → transparent
+        // CGContext.clip(to:mask:) clips based on luminosity:
+        //   white (person/subject) → draws through, black (background) → transparent.
         guard let ctx = CGContext(
             data: nil, width: w, height: h,
             bitsPerComponent: 8, bytesPerRow: 0,
@@ -160,7 +158,8 @@ enum BodyPoseProcessor {
         let h = cutout.size.height
         let w = cutout.size.width
 
-        // Fall back to `root` joint when individual hip keypoints are absent (e.g. half-body shots).
+        // Fall back to `root` joint when individual hip keypoints are absent
+        // (e.g. half-body or portrait-cropped photos).
         let shoulderY = midY(joints[.leftShoulder], joints[.rightShoulder])
         let hipY      = midY(joints[.leftHip], joints[.rightHip]) ?? joints[.root]?.y
 
