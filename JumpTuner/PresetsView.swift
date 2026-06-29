@@ -6,6 +6,7 @@ struct PresetsView: View {
     @ObservedObject var store: PresetStore
     @Binding var params: JumpParams
     @Binding var selectedQRPreset: Preset?
+    @Binding var selectedCodePreset: Preset?
     @State private var presetName = ""
 
     var body: some View {
@@ -54,6 +55,12 @@ struct PresetsView: View {
                         .buttonStyle(.bordered)
                         .tint(SectionTheme.presets)
 
+                        Button { selectedCodePreset = preset } label: {
+                            Image(systemName: "curlybraces")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(SectionTheme.presets)
+
                         Button { store.delete(id: preset.id) } label: {
                             Image(systemName: "trash")
                         }
@@ -76,7 +83,8 @@ struct PresetsView: View {
         PresetsView(
             store: store,
             params: .constant(.defaults),
-            selectedQRPreset: .constant(nil)
+            selectedQRPreset: .constant(nil),
+            selectedCodePreset: .constant(nil)
         )
         .padding(.horizontal, 12)
         .padding(.top, 10)
