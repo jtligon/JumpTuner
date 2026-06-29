@@ -8,7 +8,6 @@
 
 import UIKit
 import Vision
-import CoreImage
 
 // MARK: - Result type
 
@@ -33,38 +32,36 @@ enum BodyPoseProcessor {
     /// Always succeeds — returns a `BodySegments` with just `cutout` if
     /// segmentation or pose detection fails.
     static func process(_ source: UIImage) async -> BodySegments {
-        // Normalize orientation so Vision sees y-up, unrotated pixels.
+        // Normalize orientation so Vision sees un-rotated pixels.
         let image = source.normalized()
-        guard let ciImage = CIImage(image: image) else {
-            return BodySegments(cutout: source, head: nil, torso: nil, legs: nil)
-        }
 
         return await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let result = runVision(image: image, ciImage: ciImage)
-                continuation.resume(returning: result)
+                continuation.resume(returning: runVision(image: image))
             }
         }
     }
 
     // MARK: - Core Vision pass
 
-    private static func runVision(image: UIImage, ciImage: CIImage) -> BodySegments {
-        // Build both requests and run them in a single handler pass.
-        let segRequest  = VNGeneratePersonSegmentationRequest()
-        segRequest.qualityLevel    = .accurate
+    private static func runVision(image: UIImage) -> BodySegments {
+        guard let cgImage = image.cgImage else {
+            return BodySegments(cutout: image, head: nil, torso: nil, legs: nil)
+        }
+
+        let segRequest = VNGeneratePersonSegmentationRequest()
+        segRequest.qualityLevel      = .accurate
         segRequest.outputPixelFormat = kCVPixelFormatType_OneComponent8
 
         let poseRequest = VNDetectHumanBodyPoseRequest()
 
-        let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
         try? handler.perform([segRequest, poseRequest])
 
         // Segmentation: build clean cutout (fall back to original on failure)
         let cutout: UIImage
         if let pixelBuffer = segRequest.results?.first?.pixelBuffer {
-            cutout = applyMask(pixelBuffer, to: ciImage, size: image.size, scale: image.scale)
-                ?? image
+            cutout = applyMask(pixelBuffer, to: image) ?? image
         } else {
             cutout = image
         }
@@ -85,27 +82,54 @@ enum BodyPoseProcessor {
         return BodySegments(cutout: cutout, head: head, torso: torso, legs: legs)
     }
 
-    // MARK: - Mask compositing
+    // MARK: - Mask compositing (pure CoreGraphics — no Metal/CIContext)
 
-    private static func applyMask(
-        _ pixelBuffer: CVPixelBuffer,
-        to ciImage: CIImage,
-        size: CGSize,
-        scale: CGFloat
-    ) -> UIImage? {
-        let maskCI = CIImage(cvPixelBuffer: pixelBuffer)
-        let scaleX = ciImage.extent.width  / maskCI.extent.width
-        let scaleY = ciImage.extent.height / maskCI.extent.height
-        let scaledMask = maskCI.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+    private static func applyMask(_ pixelBuffer: CVPixelBuffer, to image: UIImage) -> UIImage? {
+        // Copy mask bytes before releasing the lock so the CGDataProvider
+        // has a stable, owned buffer for its lifetime.
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        let mw  = CVPixelBufferGetWidth(pixelBuffer)
+        let mh  = CVPixelBufferGetHeight(pixelBuffer)
+        let bpr = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        guard let base = CVPixelBufferGetBaseAddress(pixelBuffer) else {
+            CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
+            return nil
+        }
+        let maskData = Data(bytes: base, count: mh * bpr)
+        CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly)
 
-        let masked = ciImage.applyingFilter("CIBlendWithMask", parameters: [
-            kCIInputMaskImageKey:       scaledMask,
-            kCIInputBackgroundImageKey: CIImage.empty()
-        ])
+        // Build a grayscale CGImage from the mask bytes.
+        // Vision produces white=person, black=background in OneComponent8 format.
+        guard let provider = CGDataProvider(data: maskData as CFData),
+              let maskCG = CGImage(
+                  width: mw, height: mh,
+                  bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: bpr,
+                  space: CGColorSpaceCreateDeviceGray(),
+                  bitmapInfo: CGBitmapInfo(),
+                  provider: provider,
+                  decode: nil, shouldInterpolate: true,
+                  intent: .defaultIntent),
+              let sourceCG = image.cgImage else { return nil }
 
-        let ctx = CIContext(options: [.useSoftwareRenderer: false])
-        guard let cgImage = ctx.createCGImage(masked, from: masked.extent) else { return nil }
-        return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+        let w = sourceCG.width
+        let h = sourceCG.height
+
+        // Draw into RGBA context clipped by the mask.
+        // CGContext.clip(to:mask:) treats the grayscale luminosity as the clip weight:
+        //   luminosity = 1 (white/person)  → draws through → opaque foreground pixels
+        //   luminosity = 0 (black/bg)      → clips out    → transparent
+        guard let ctx = CGContext(
+            data: nil, width: w, height: h,
+            bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+
+        ctx.clip(to: CGRect(x: 0, y: 0, width: w, height: h), mask: maskCG)
+        ctx.draw(sourceCG, in: CGRect(x: 0, y: 0, width: w, height: h))
+
+        guard let result = ctx.makeImage() else { return nil }
+        return UIImage(cgImage: result, scale: image.scale, orientation: .up)
     }
 
     // MARK: - Joint coordinate conversion
@@ -136,15 +160,17 @@ enum BodyPoseProcessor {
         let h = cutout.size.height
         let w = cutout.size.width
 
-        guard let shoulderY = midY(joints[.leftShoulder], joints[.rightShoulder]),
-              let hipY      = midY(joints[.leftHip],      joints[.rightHip]),
-              shoulderY < hipY else { return (nil, nil, nil) }
+        // Fall back to `root` joint when individual hip keypoints are absent (e.g. half-body shots).
+        let shoulderY = midY(joints[.leftShoulder], joints[.rightShoulder])
+        let hipY      = midY(joints[.leftHip], joints[.rightHip]) ?? joints[.root]?.y
 
-        // Add overlap at each boundary so seams are hidden by the SkeletalCharacterNode
+        guard let shoulderY, let hipY, shoulderY < hipY else { return (nil, nil, nil) }
+
+        // Add overlap at each boundary so seams are hidden by SkeletalCharacterNode.
         let overlap: CGFloat = 6
-        let headRect  = CGRect(x: 0, y: 0,                     width: w, height: shoulderY + overlap)
-        let torsoRect = CGRect(x: 0, y: shoulderY - overlap,   width: w, height: (hipY - shoulderY) + overlap * 2)
-        let legsRect  = CGRect(x: 0, y: hipY - overlap,        width: w, height: h - (hipY - overlap))
+        let headRect  = CGRect(x: 0, y: 0,                   width: w, height: shoulderY + overlap)
+        let torsoRect = CGRect(x: 0, y: shoulderY - overlap, width: w, height: (hipY - shoulderY) + overlap * 2)
+        let legsRect  = CGRect(x: 0, y: hipY - overlap,      width: w, height: h - (hipY - overlap))
 
         return (
             crop(cutout, to: headRect),
@@ -158,7 +184,7 @@ enum BodyPoseProcessor {
         case let (p?, q?): return (p.y + q.y) / 2
         case let (p?, nil): return p.y
         case let (nil, q?): return q.y
-        case (nil, nil): return nil
+        case (nil, nil):    return nil
         }
     }
 
@@ -175,8 +201,7 @@ enum BodyPoseProcessor {
 // MARK: - UIImage orientation normalization
 
 private extension UIImage {
-    /// Returns a copy of the image drawn with .up orientation so Vision
-    /// sees unrotated pixel data regardless of capture orientation.
+    /// Returns a copy redrawn at .up orientation so Vision sees un-rotated pixels.
     func normalized() -> UIImage {
         guard imageOrientation != .up else { return self }
         let renderer = UIGraphicsImageRenderer(size: size)
