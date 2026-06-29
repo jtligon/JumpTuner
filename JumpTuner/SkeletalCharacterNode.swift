@@ -31,6 +31,12 @@ final class SkeletalCharacterNode: SKNode, CharacterNode {
         super.init()
         addChild(fallback)
 
+        // Pulse while Vision is running so the user knows something is happening.
+        fallback.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.4, duration: 0.7),
+            .fadeAlpha(to: 1.0, duration: 0.7)
+        ])), withKey: "loading")
+
         Task { [weak self] in
             guard let self else { return }
             let segments = await BodyPoseProcessor.process(image)
@@ -61,6 +67,10 @@ final class SkeletalCharacterNode: SKNode, CharacterNode {
     // MARK: - Skeleton upgrade (called once on Main after Vision completes)
 
     private func buildSkeleton(_ segments: BodySegments) {
+        // Vision is done — stop the loading pulse.
+        fallback.removeAction(forKey: "loading")
+        fallback.alpha = 1
+
         guard segments.hasSkeleton,
               let head  = segments.head,
               let torso = segments.torso,

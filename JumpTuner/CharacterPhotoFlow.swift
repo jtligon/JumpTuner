@@ -37,12 +37,30 @@ private struct CharacterPhotoFlowModifier: ViewModifier {
     // Intermediate state
     @State private var sourceImage: UIImage?
     @State private var showingPlayground    = false
+    @State private var isLoadingSource      = false
 
     private var playgroundAvailable: Bool { ImagePlaygroundViewController.isAvailable }
     private var cameraAvailable: Bool { UIImagePickerController.isSourceTypeAvailable(.camera) }
 
     func body(content: Content) -> some View {
         content
+            .overlay {
+                if isLoadingSource {
+                    ZStack {
+                        Color.black.opacity(0.55).ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white)
+                                .scaleEffect(1.4)
+                            Text("Preparing photo…")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                }
+            }
             .onChange(of: isPresented) { _, presented in
                 guard presented else { return }
                 isPresented = false   // reset immediately; we drive our own sheets
@@ -79,16 +97,21 @@ private struct CharacterPhotoFlowModifier: ViewModifier {
                     get: { nil as PhotosPickerItem? },
                     set: { item in
                         guard let item else { return }
+                        isLoadingSource = true
                         Task {
                             if let data  = try? await item.loadTransferable(type: Data.self),
                                let image = UIImage(data: data) {
                                 sourceImage = image
                                 if playgroundAvailable {
                                     showingPlayground = true
+                                    // Overlay clears when playground sheet appears.
                                 } else {
-                                    // Simulator / no AI: use image directly
+                                    // Simulator / no AI: use image directly.
                                     commitImage(image, viaPlayground: false)
+                                    isLoadingSource = false
                                 }
+                            } else {
+                                isLoadingSource = false
                             }
                         }
                     }
@@ -97,6 +120,9 @@ private struct CharacterPhotoFlowModifier: ViewModifier {
                 photoLibrary: .shared()
             )
             // Image Playground (device with Apple Intelligence only)
+            .onChange(of: showingPlayground) { _, showing in
+                if showing { isLoadingSource = false }
+            }
             .imagePlaygroundSheet(
                 isPresented: $showingPlayground,
                 concepts: [.text("pixel art game character jumping sprite")],
@@ -107,7 +133,8 @@ private struct CharacterPhotoFlowModifier: ViewModifier {
                 },
                 onCancellation: {
                     showingPlayground = false
-                    sourceImage = nil
+                    isLoadingSource   = false
+                    sourceImage       = nil
                 }
             )
     }
