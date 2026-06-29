@@ -24,9 +24,17 @@ struct CharacterSkin: Identifiable {
     static let rabbit = CharacterSkin(id: "rabbit", name: "Rabbit", make: RabbitNode.init)
     static let pirate = CharacterSkin(id: "pirate", name: "Pirate", make: PirateNode.init)
 
+    /// Playground-generated image → simple single-sprite with tilt.
     static func generated(image: UIImage, name: String) -> CharacterSkin {
         CharacterSkin(id: "gen-\(UUID().uuidString)", name: name) {
             GeneratedCharacterNode(image: image)
+        }
+    }
+
+    /// Raw photo → segmented skeletal puppet via Vision (BodyPoseProcessor).
+    static func fromPhoto(image: UIImage, name: String) -> CharacterSkin {
+        CharacterSkin(id: "photo-\(UUID().uuidString)", name: name) {
+            SkeletalCharacterNode(image: image)
         }
     }
 }
