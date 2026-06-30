@@ -2,6 +2,7 @@
 // Jump cycle driven entirely by SKAction sequences — no physics, no contact detection.
 
 import SpriteKit
+import UIKit
 
 final class JumpScene: SKScene {
 
@@ -16,6 +17,8 @@ final class JumpScene: SKScene {
     var params: JumpParams = .defaults { didSet { if isJumping { restartJump() } } }
     var isLooping: Bool = false
 
+    private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+
     private var isJumping = false
     private let groundY: CGFloat = 36
     private let characterSize = CGSize(width: 36, height: 48)
@@ -25,6 +28,7 @@ final class JumpScene: SKScene {
     override func didMove(to view: SKView) {
         backgroundColor = UIColor(red: 0.05, green: 0.07, blue: 0.18, alpha: 1)
         physicsWorld.gravity = .zero
+        impactFeedback.prepare()
         setupStars()
         setupGround()
         setupCharacter()
@@ -126,6 +130,13 @@ final class JumpScene: SKScene {
         addChild(character)
     }
 
+    // MARK: - Haptics
+
+    private func fireHaptic() {
+        impactFeedback.impactOccurred()
+        impactFeedback.prepare()
+    }
+
     // MARK: - Jump
 
     private func startJump() {
@@ -187,6 +198,7 @@ final class JumpScene: SKScene {
 
             // Land squash
             setPhase(.landing),
+            .run { [weak self] in self?.fireHaptic() },
             scaleGroup(x: config.landScaleX, y: config.landScaleY, duration: frameDur),
 
             // Recover to neutral
@@ -216,6 +228,7 @@ final class JumpScene: SKScene {
                     setPhase(.descending),
                     moveTo(y: restY,   duration: bDescent, timing: .easeIn),
                     setPhase(.landing),
+                    .run { [weak self] in self?.fireHaptic() },
                     scaleGroup(x: bSquashX, y: bSquashY, duration: frameDur),
                     scaleGroup(x: 1,        y: 1,        duration: bLandingDur),
                 ]
