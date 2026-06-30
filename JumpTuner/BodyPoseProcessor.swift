@@ -85,7 +85,8 @@ enum BodyPoseProcessor {
 
     // MARK: - Mask compositing (pure CoreGraphics — no Metal/CIContext)
 
-    private static func applyMask(_ pixelBuffer: CVPixelBuffer, to image: UIImage) -> UIImage? {
+    // `internal` (not private) so tests can call it directly with a known pixel buffer.
+    static func applyMask(_ pixelBuffer: CVPixelBuffer, to image: UIImage) -> UIImage? {
         // Copy mask bytes before unlocking so the CGDataProvider has a stable buffer.
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         let mw  = CVPixelBufferGetWidth(pixelBuffer)
@@ -201,9 +202,12 @@ enum BodyPoseProcessor {
 
 private extension UIImage {
     /// Returns a copy redrawn at .up orientation so Vision sees un-rotated pixels.
+    /// Uses scale=1.0 so a 4K photo isn't tripled to 12K+ pixels by the device scale factor.
     func normalized() -> UIImage {
         guard imageOrientation != .up else { return self }
-        let renderer = UIGraphicsImageRenderer(size: size)
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1.0
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { _ in draw(in: CGRect(origin: .zero, size: size)) }
     }
 }
