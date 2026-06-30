@@ -81,6 +81,7 @@ struct JumpPreviewView: View {
 
     @State private var looping: Bool = false
     @State private var animating: Bool = false
+    @State private var showParamText: Bool = true
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
     @State private var showingPhotoPicker = false
@@ -124,6 +125,33 @@ struct JumpPreviewView: View {
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(
                                         looping ? Color.groundColor : .white.opacity(0.7)
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        // Floating param text toggle
+                        Button {
+                            showParamText.toggle()
+                            scene.showFloatingText = showParamText
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(showParamText
+                                          ? Color.groundColor.opacity(0.3)
+                                          : Color.white.opacity(0.12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(showParamText
+                                                    ? Color.groundColor
+                                                    : Color.white.opacity(0.3),
+                                                    lineWidth: 1.5)
+                                    )
+                                    .frame(width: 42, height: 32)
+                                Image(systemName: "text.bubble")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(
+                                        showParamText ? Color.groundColor : .white.opacity(0.7)
                                     )
                             }
                         }
