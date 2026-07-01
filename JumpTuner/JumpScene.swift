@@ -140,7 +140,7 @@ final class JumpScene: SKScene {
 
     // MARK: - Floating param text
 
-    private var floatingTextYBase: CGFloat { groundY + 60 }
+    private var floatingTextYBase: CGFloat { groundY + 80 }
 
     private func spawnFloatingLabel(_ text: String, yOffset: CGFloat = 0) {
         let label = SKLabelNode(text: text)
@@ -152,7 +152,7 @@ final class JumpScene: SKScene {
         label.position = CGPoint(x: size.width - 14, y: floatingTextYBase + yOffset)
         addChild(label)
 
-        let rise   = SKAction.moveBy(x: 0, y: 52, duration: 1.6)
+        let rise   = SKAction.moveBy(x: 0, y: 110, duration: 1.6)
         rise.timingMode = .easeOut
         let fade   = SKAction.fadeOut(withDuration: 1.6)
         label.run(.sequence([.group([rise, fade]), .removeFromParent()]))
@@ -163,7 +163,7 @@ final class JumpScene: SKScene {
             guard let self, showFloatingText else { return }
             let events = phase.paramEvents(for: params)
             for (i, event) in events.enumerated() {
-                spawnFloatingLabel(event.formatted, yOffset: CGFloat(i) * 16)
+                spawnFloatingLabel(event.formatted, yOffset: CGFloat(i) * 22)
             }
         }
     }

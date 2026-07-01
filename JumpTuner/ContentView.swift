@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var drawerOpen         = true
     @State private var showHelp           = false
     @State private var jumpTrigger        = 0
+    @State private var showFloatingText   = true
 
     private let drawerWidth: CGFloat = 260
 
@@ -18,7 +19,7 @@ struct ContentView: View {
             ZStack(alignment: .trailing) {
 
                 // Full-screen preview — always fills the whole screen
-                JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger)
+                JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger, showParamText: $showFloatingText)
                     .ignoresSafeArea()
                     .onTapGesture {
                         if !drawerOpen { jumpTrigger += 1 }
@@ -86,7 +87,7 @@ struct ContentView: View {
 
                     ScrollView {
                         VStack(spacing: 8) {
-                            ParamsEditorView(params: $params)
+                            ParamsEditorView(params: $params, showFloatingText: $showFloatingText)
                             PresetsView(
                                 store: store,
                                 params: $params,

@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ParamsEditorView: View {
     @Binding var params: JumpParams
+    @Binding var showFloatingText: Bool
 
     var body: some View {
         VStack(spacing: 8) {
@@ -66,13 +67,19 @@ struct ParamsEditorView: View {
                 LabeledSlider(label: "Bounce count",         value: $params.bounceCount,
                               range: 1...6, step: 1, decimals: 0, color: SectionTheme.feel)
             }
+
+            CollapsibleSection(title: "Floating text", icon: "text.bubble",
+                               accentColor: SectionTheme.feel) {
+                LabeledToggle(label: "Show floating text",   value: $showFloatingText,
+                              color: SectionTheme.feel)
+            }
         }
     }
 }
 
 #Preview {
     ScrollView {
-        ParamsEditorView(params: .constant(.defaults))
+        ParamsEditorView(params: .constant(.defaults), showFloatingText: .constant(true))
             .padding(.horizontal, 12)
             .padding(.top, 10)
     }
