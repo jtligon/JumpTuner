@@ -78,10 +78,10 @@ struct StarsView: View {
 struct JumpPreviewView: View {
     @Binding var params: JumpParams
     @Binding var jumpTrigger: Int
+    @Binding var showParamText: Bool
 
     @State private var looping: Bool = false
     @State private var animating: Bool = false
-    @State private var showParamText: Bool = true
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
     @State private var showingPhotoPicker = false
@@ -101,7 +101,8 @@ struct JumpPreviewView: View {
                     .ignoresSafeArea()
 
                 // Controls — top bar
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Row 1: playback controls
                     HStack(spacing: 10) {
                         // Loop toggle
                         Button {
@@ -130,33 +131,6 @@ struct JumpPreviewView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // Floating param text toggle
-                        Button {
-                            showParamText.toggle()
-                            scene.showFloatingText = showParamText
-                        } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(showParamText
-                                          ? Color.groundColor.opacity(0.3)
-                                          : Color.white.opacity(0.12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(showParamText
-                                                    ? Color.groundColor
-                                                    : Color.white.opacity(0.3),
-                                                    lineWidth: 1.5)
-                                    )
-                                    .frame(width: 42, height: 32)
-                                Image(systemName: "text.bubble")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(
-                                        showParamText ? Color.groundColor : .white.opacity(0.7)
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-
                         // Play / stop
                         ControllerButton(isPlaying: animating) {
                             if animating {
@@ -169,46 +143,20 @@ struct JumpPreviewView: View {
                         }
 
                         Spacer()
-
-                        // Character picker — built-in + generated, plus a + button
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(allSkins) { skin in
-                                    SkinChip(skin: skin, isSelected: skin.id == selectedSkin.id) {
-                                        selectedSkin = skin
-                                        scene.setCharacter(skin)
-                                    }
-                                }
-
-                                // Add custom skin via photo
-                                Button {
-                                    showingPhotoPicker = true
-                                } label: {
-                                    Image(systemName: "camera.fill")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.75))
-                                        .padding(.horizontal, 9)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(Color.white.opacity(0.12))
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 10)
-                                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                                )
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.horizontal, 2)
-                        }
-                        .frame(maxWidth: 240)
-                        .padding(.trailing, 16)
                     }
-                    .padding(.leading, 16)
-                    .padding(.top, 56)
-                    Spacer()
+
+                    // Row 2: character picker — wraps horizontally
+                    ChipFlowView(allSkins: allSkins, selectedSkin: selectedSkin) { skin in
+                        selectedSkin = skin
+                        scene.setCharacter(skin)
+                    } onAdd: {
+                        showingPhotoPicker = true
+                    }
                 }
+                .padding(.leading, 16)
+                .padding(.trailing, 16)
+                .padding(.top, 56)
+                Spacer()
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -225,6 +173,93 @@ struct JumpPreviewView: View {
             animating = true
             scene.triggerJump()
         }
+        .onChange(of: showParamText) {
+            scene.showFloatingText = showParamText
+        }
+    }
+}
+
+// MARK: - Chip flow layout
+
+private struct ChipFlowView: View {
+    let allSkins: [CharacterSkin]
+    let selectedSkin: CharacterSkin
+    let onSelect: (CharacterSkin) -> Void
+    let onAdd: () -> Void
+
+    var body: some View {
+        WrapLayout(hSpacing: 6, vSpacing: 6) {
+            ForEach(allSkins) { skin in
+                SkinChip(skin: skin, isSelected: skin.id == selectedSkin.id) {
+                    onSelect(skin)
+                }
+            }
+            Button(action: onAdd) {
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.75))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.white.opacity(0.12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+/// Wrapping flow layout using the Layout protocol (iOS 16+).
+private struct WrapLayout: Layout {
+    var hSpacing: CGFloat = 6
+    var vSpacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        var height: CGFloat = 0
+        for (i, row) in rows.enumerated() {
+            let rowH = row.map { subviews[$0].sizeThatFits(.unspecified).height }.max() ?? 0
+            height += rowH
+            if i < rows.count - 1 { height += vSpacing }
+        }
+        return CGSize(width: proposal.width ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        var y = bounds.minY
+        for row in rows {
+            var x = bounds.minX
+            let rowH = row.map { subviews[$0].sizeThatFits(.unspecified).height }.max() ?? 0
+            for idx in row {
+                let size = subviews[idx].sizeThatFits(.unspecified)
+                subviews[idx].place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+                x += size.width + hSpacing
+            }
+            y += rowH + vSpacing
+        }
+    }
+
+    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[Int]] {
+        let maxW = proposal.width ?? .infinity
+        var rows: [[Int]] = [[]]
+        var rowWidth: CGFloat = 0
+        for (i, subview) in subviews.enumerated() {
+            let w = subview.sizeThatFits(.unspecified).width
+            if !rows[rows.count - 1].isEmpty, rowWidth + w > maxW {
+                rows.append([i])
+                rowWidth = w + hSpacing
+            } else {
+                rows[rows.count - 1].append(i)
+                rowWidth += w + hSpacing
+            }
+        }
+        return rows
     }
 }
 
@@ -257,6 +292,6 @@ private struct SkinChip: View {
 }
 
 #Preview {
-    JumpPreviewView(params: .constant(.defaults), jumpTrigger: .constant(0))
+    JumpPreviewView(params: .constant(.defaults), jumpTrigger: .constant(0), showParamText: .constant(true))
         .ignoresSafeArea()
 }
