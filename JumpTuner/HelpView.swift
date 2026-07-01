@@ -95,6 +95,12 @@ private let helpSections: [HelpSection] = [
             HelpItem(name: "Bounce count",
                      description: "How many rubber bounces occur after the main landing. Each bounce is 25% the height of the previous one, so higher counts produce progressively tinier hops.",
                      tip: "Requires Rubber bounce to be enabled."),
+            HelpItem(name: "Double jump",
+                     description: "Allows the character to jump a second time while airborne. The first jump reaches a configurable fraction of the total peak height; the second jump carries the character the rest of the way.",
+                     tip: "Classic mechanic from Sonic, Celeste, and Hollow Knight. Works best with a short first jump (0.4–0.5) to make the second feel powerful."),
+            HelpItem(name: "1st jump height",
+                     description: "Fraction of the total peak height reached by the first jump. 0.6 means the first jump goes 60% of the way up; the second jump covers the remaining 40%. Range: 0.2–0.9.",
+                     tip: "Requires Double jump to be enabled."),
         ]
     ),
 ]

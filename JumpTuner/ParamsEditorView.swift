@@ -65,6 +65,10 @@ struct ParamsEditorView: View {
                               color: SectionTheme.feel)
                 LabeledSlider(label: "Bounce count",         value: $params.bounceCount,
                               range: 1...6, step: 1, decimals: 0, color: SectionTheme.feel)
+                LabeledToggle(label: "Double jump",          value: $params.features.doubleJump,
+                              color: SectionTheme.feel)
+                LabeledSlider(label: "1st jump height",      value: $params.doubleJumpHeightFactor,
+                              range: 0.2...0.9, step: 0.05, decimals: 2, color: SectionTheme.feel)
             }
         }
     }

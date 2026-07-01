@@ -49,6 +49,11 @@ struct JumpFeatures: Codable, Equatable {
     /// landing squashes less. Number of bounces controlled by
     /// `JumpParams.bounceCount`.
     var rubberBounce: Bool = false
+
+    /// Allows a second jump while already airborne.
+    /// The first jump reaches `doubleJumpHeightFactor` of the total height;
+    /// the second jump carries the character the rest of the way to the peak.
+    var doubleJump: Bool = false
 }
 
 // MARK: - JumpParams
@@ -143,7 +148,12 @@ struct JumpParams: Codable, Equatable {
     /// proportionally less. Requires `features.rubberBounce`. Range: 1–6.
     var bounceCount: Double = 2
 
-    /// The five boolean feel toggles.
+    /// Fraction of total jump height reached by the first jump when double
+    /// jump is enabled. The second jump covers the remaining distance.
+    /// Requires `features.doubleJump`. Range: 0.2–0.9.
+    var doubleJumpHeightFactor: Double = 0.6
+
+    /// The boolean feel toggles.
     var features: JumpFeatures = JumpFeatures()
 
     // MARK: Presets
@@ -156,21 +166,22 @@ struct JumpParams: Codable, Equatable {
     /// All values are chosen so the result is a valid (if eccentric) jump.
     static func randomized() -> JumpParams {
         JumpParams(
-            squatFrames:    Double(Int.random(in: 0...8)),
-            ascentFrames:   Double(Int.random(in: 5...25)),
-            apexFrames:     Double(Int.random(in: 0...6)),
-            descentFrames:  Double(Int.random(in: 4...20)),
-            landingFrames:  Double(Int.random(in: 1...8)),
-            jumpHeight:     Double(Int.random(in: 20...400)),
-            squatScale:     Double(Int.random(in: 10...20)) / 20.0,
-            launchScale:    Double(Int.random(in: 20...38)) / 20.0,
-            landScale:      Double(Int.random(in: 6...18)) / 20.0,
-            coyoteFrames:   Double(Int.random(in: 1...8)),
-            bufferFrames:   Double(Int.random(in: 1...8)),
-            fallMult:       Double(Int.random(in: 10...28)) / 10.0,
-            apexGravFactor: Double(Int.random(in: 2...18)) / 20.0,
-            floatFrames:    Double(Int.random(in: 0...30)),
-            bounceCount:    Double(Int.random(in: 1...4)),
+            squatFrames:           Double(Int.random(in: 0...8)),
+            ascentFrames:          Double(Int.random(in: 5...25)),
+            apexFrames:            Double(Int.random(in: 0...6)),
+            descentFrames:         Double(Int.random(in: 4...20)),
+            landingFrames:         Double(Int.random(in: 1...8)),
+            jumpHeight:            Double(Int.random(in: 20...400)),
+            squatScale:            Double(Int.random(in: 10...20)) / 20.0,
+            launchScale:           Double(Int.random(in: 20...38)) / 20.0,
+            landScale:             Double(Int.random(in: 6...18)) / 20.0,
+            coyoteFrames:          Double(Int.random(in: 1...8)),
+            bufferFrames:          Double(Int.random(in: 1...8)),
+            fallMult:              Double(Int.random(in: 10...28)) / 10.0,
+            apexGravFactor:        Double(Int.random(in: 2...18)) / 20.0,
+            floatFrames:           Double(Int.random(in: 0...30)),
+            bounceCount:           Double(Int.random(in: 1...4)),
+            doubleJumpHeightFactor: Double(Int.random(in: 4...16)) / 20.0,
             features: JumpFeatures(
                 coyoteTime:   Bool.random(),
                 jumpBuffer:   Bool.random(),
@@ -178,7 +189,8 @@ struct JumpParams: Codable, Equatable {
                 asymGrav:     Bool.random(),
                 apexGrav:     Bool.random(),
                 floating:     Bool.random(),
-                rubberBounce: Bool.random()
+                rubberBounce: Bool.random(),
+                doubleJump:   Bool.random()
             )
         )
     }

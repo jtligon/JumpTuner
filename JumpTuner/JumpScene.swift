@@ -177,17 +177,46 @@ final class JumpScene: SKScene {
             // Squat anticipation
             setPhase(.squat),
             scaleGroup(x: config.squatScaleX, y: config.squatScaleY, duration: config.squatDuration),
+        ]
 
-            // Launch stretch — briefly widen and elongate
-            setPhase(.ascending),
-            scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+        if params.features.doubleJump {
+            let heightFactor = CGFloat(params.doubleJumpHeightFactor)
+            let firstPeakY = restY + scaledHeight() * heightFactor
+            let firstAscentDuration = ascentDuration * Double(heightFactor)
+            let secondAscentDuration = max(2.0 / 60.0, ascentDuration * Double(1.0 - heightFactor))
 
-            // Rise to peak: position eases out (decelerates), scale relaxes back to neutral
-            SKAction.group([
-                moveTo(y: peakY, duration: ascentDuration, timing: .easeOut),
-                scaleGroup(x: 1, y: 1, duration: ascentDuration * 0.4)
-            ]),
+            steps += [
+                // First jump — launch and rise to intermediate height
+                setPhase(.ascending),
+                scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+                SKAction.group([
+                    moveTo(y: firstPeakY, duration: firstAscentDuration, timing: .easeOut),
+                    scaleGroup(x: 1, y: 1, duration: firstAscentDuration * 0.4)
+                ]),
 
+                // Mid-air second jump — re-launch and continue to full peak
+                setPhase(.ascending),
+                scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+                SKAction.group([
+                    moveTo(y: peakY, duration: secondAscentDuration, timing: .easeOut),
+                    scaleGroup(x: 1, y: 1, duration: secondAscentDuration * 0.4)
+                ]),
+            ]
+        } else {
+            steps += [
+                // Launch stretch — briefly widen and elongate
+                setPhase(.ascending),
+                scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+
+                // Rise to peak: position eases out (decelerates), scale relaxes back to neutral
+                SKAction.group([
+                    moveTo(y: peakY, duration: ascentDuration, timing: .easeOut),
+                    scaleGroup(x: 1, y: 1, duration: ascentDuration * 0.4)
+                ]),
+            ]
+        }
+
+        steps += [
             // Apex float
             setPhase(.apex),
             .wait(forDuration: config.apexDuration),
