@@ -16,6 +16,7 @@ final class JumpScene: SKScene {
 
     var params: JumpParams = .defaults { didSet { if isJumping { restartJump() } } }
     var isLooping: Bool = false
+    var showFloatingText: Bool = true
 
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
@@ -137,6 +138,36 @@ final class JumpScene: SKScene {
         impactFeedback.prepare()
     }
 
+    // MARK: - Floating param text
+
+    private var floatingTextYBase: CGFloat { groundY + 80 }
+
+    private func spawnFloatingLabel(_ text: String, yOffset: CGFloat = 0) {
+        let label = SKLabelNode(text: text)
+        label.fontSize = 11
+        label.fontColor = SKColor(red: 0.85, green: 1.0, blue: 0.85, alpha: 1)
+        label.fontName = "Menlo-Bold"
+        label.horizontalAlignmentMode = .right
+        label.alpha = 0.9
+        label.position = CGPoint(x: size.width - 14, y: floatingTextYBase + yOffset)
+        addChild(label)
+
+        let rise   = SKAction.moveBy(x: 0, y: 110, duration: 1.6)
+        rise.timingMode = .easeOut
+        let fade   = SKAction.fadeOut(withDuration: 1.6)
+        label.run(.sequence([.group([rise, fade]), .removeFromParent()]))
+    }
+
+    private func spawnPhaseLabels(_ phase: JumpPhase) -> SKAction {
+        .run { [weak self] in
+            guard let self, showFloatingText else { return }
+            let events = phase.paramEvents(for: params)
+            for (i, event) in events.enumerated() {
+                spawnFloatingLabel(event.formatted, yOffset: CGFloat(i) * 22)
+            }
+        }
+    }
+
     // MARK: - Jump
 
     private func startJump() {
@@ -175,10 +206,12 @@ final class JumpScene: SKScene {
 
         var steps: [SKAction] = [
             // Squat anticipation
+            spawnPhaseLabels(.squat),
             setPhase(.squat),
             scaleGroup(x: config.squatScaleX, y: config.squatScaleY, duration: config.squatDuration),
 
             // Launch stretch — briefly widen and elongate
+            spawnPhaseLabels(.ascending),
             setPhase(.ascending),
             scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
 
@@ -189,14 +222,17 @@ final class JumpScene: SKScene {
             ]),
 
             // Apex float
+            spawnPhaseLabels(.apex),
             setPhase(.apex),
             .wait(forDuration: config.apexDuration),
 
             // Descent: position eases in (accelerates)
+            spawnPhaseLabels(.descending),
             setPhase(.descending),
             moveTo(y: restY, duration: descentDuration, timing: .easeIn),
 
             // Land squash
+            spawnPhaseLabels(.landing),
             setPhase(.landing),
             .run { [weak self] in self?.fireHaptic() },
             scaleGroup(x: config.landScaleX, y: config.landScaleY, duration: frameDur),
