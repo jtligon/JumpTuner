@@ -17,6 +17,9 @@ final class JumpScene: SKScene {
     var params: JumpParams = .defaults { didSet { if isJumping { restartJump() } } }
     var isLooping: Bool = false
 
+    /// Called on the main thread each time a jump phase begins; receives lines of "param: value" text.
+    var onLabel: (([String]) -> Void)?
+
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
     private var isJumping = false
@@ -137,6 +140,14 @@ final class JumpScene: SKScene {
         impactFeedback.prepare()
     }
 
+    // MARK: - Floating labels
+
+    private func labelAction(_ lines: [String]) -> SKAction {
+        .run { [weak self] in
+            DispatchQueue.main.async { self?.onLabel?(lines) }
+        }
+    }
+
     // MARK: - Jump
 
     private func startJump() {
@@ -172,14 +183,36 @@ final class JumpScene: SKScene {
         let frameDur: TimeInterval = 2.0 / 60.0
         let ascentDuration  = params.ascentFrames / 60.0
         let descentDuration = params.descentFrames / 60.0
+        let p = params
+
+        var apexLines = ["apexFrames: \(Int(p.apexFrames)) fr"]
+        if p.features.floating { apexLines.append("floatFrames: \(Int(p.floatFrames)) fr") }
+        if p.features.apexGrav  { apexLines.append("apexGravFactor: \(String(format: "%.2f", p.apexGravFactor))") }
+
+        var descentLines = ["descentFrames: \(Int(p.descentFrames)) fr"]
+        if p.features.asymGrav { descentLines.append("fallMult: \(String(format: "%.1f", p.fallMult))×") }
+
+        var landingLines = [
+            "landingFrames: \(Int(p.landingFrames)) fr",
+            "landScale: \(String(format: "%.2f", p.landScale))"
+        ]
+        if p.features.rubberBounce { landingLines.append("bounceCount: \(Int(p.bounceCount))") }
 
         var steps: [SKAction] = [
             // Squat anticipation
             setPhase(.squat),
+            labelAction([
+                "squatFrames: \(Int(p.squatFrames)) fr",
+                "squatScale: \(String(format: "%.2f", p.squatScale))"
+            ]),
             scaleGroup(x: config.squatScaleX, y: config.squatScaleY, duration: config.squatDuration),
 
             // Launch stretch — briefly widen and elongate
             setPhase(.ascending),
+            labelAction([
+                "ascentFrames: \(Int(p.ascentFrames)) fr",
+                "launchScale: \(String(format: "%.2f", p.launchScale))"
+            ]),
             scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
 
             // Rise to peak: position eases out (decelerates), scale relaxes back to neutral
@@ -190,15 +223,18 @@ final class JumpScene: SKScene {
 
             // Apex float
             setPhase(.apex),
+            labelAction(apexLines),
             .wait(forDuration: config.apexDuration),
 
             // Descent: position eases in (accelerates)
             setPhase(.descending),
+            labelAction(descentLines),
             moveTo(y: restY, duration: descentDuration, timing: .easeIn),
 
             // Land squash
             setPhase(.landing),
             .run { [weak self] in self?.fireHaptic() },
+            labelAction(landingLines),
             scaleGroup(x: config.landScaleX, y: config.landScaleY, duration: frameDur),
 
             // Recover to neutral
@@ -221,9 +257,11 @@ final class JumpScene: SKScene {
                 let bLandingDur   = max(2.0 / 60.0, config.landingDuration * ds)
                 let bSquashY      = CGFloat(1.0 - baseDeform * Double(hr))
                 let bSquashX      = 1.0 / bSquashY
+                let bounceNum     = i + 1
 
                 steps += [
                     setPhase(.ascending),
+                    labelAction(["bounce \(bounceNum) ↑"]),
                     moveTo(y: bounceY, duration: bAscent,  timing: .easeOut),
                     setPhase(.descending),
                     moveTo(y: restY,   duration: bDescent, timing: .easeIn),
