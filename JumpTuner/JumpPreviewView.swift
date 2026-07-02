@@ -73,6 +73,14 @@ struct StarsView: View {
     }
 }
 
+// MARK: - Floating label entry
+
+private struct FloatingLabelEntry: Identifiable {
+    let id = UUID()
+    let lines: [String]
+    var risen: Bool = false
+}
+
 // MARK: - Jump preview
 
 struct JumpPreviewView: View {
@@ -84,6 +92,7 @@ struct JumpPreviewView: View {
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
     @State private var showingPhotoPicker = false
+    @State private var floatingLabels: [FloatingLabelEntry] = []
 
     @State private var scene: JumpScene = {
         let s = JumpScene()
@@ -98,6 +107,43 @@ struct JumpPreviewView: View {
             ZStack(alignment: .bottom) {
                 SpriteView(scene: scene)
                     .ignoresSafeArea()
+
+                // Floating combat text overlay — parameter labels that rise and fade
+                ZStack {
+                    ForEach(floatingLabels) { entry in
+                        VStack(alignment: .trailing, spacing: 3) {
+                            ForEach(entry.lines, id: \.self) { line in
+                                Text(line)
+                                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .fill(Color.black.opacity(0.55))
+                                    )
+                            }
+                        }
+                        .offset(y: entry.risen ? -90 : 0)
+                        .opacity(entry.risen ? 0 : 1)
+                        .animation(.easeOut(duration: 1.6), value: entry.risen)
+                        .onAppear {
+                            let entryID = entry.id
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                if let idx = floatingLabels.firstIndex(where: { $0.id == entryID }) {
+                                    floatingLabels[idx].risen = true
+                                }
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                                floatingLabels.removeAll { $0.id == entryID }
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .padding(.trailing, 16)
+                .padding(.bottom, geo.size.height * 0.35)
+                .allowsHitTesting(false)
 
                 // Controls — top bar
                 VStack(spacing: 0) {
@@ -196,6 +242,11 @@ struct JumpPreviewView: View {
         .onChange(of: jumpTrigger) {
             animating = true
             scene.triggerJump()
+        }
+        .onAppear {
+            scene.onLabel = { lines in
+                floatingLabels.append(FloatingLabelEntry(lines: lines))
+            }
         }
     }
 }
