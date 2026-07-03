@@ -14,12 +14,23 @@ struct LabeledSlider: View {
     let decimals: Int
     var color: Color = .accentColor
 
+    @State private var isScrubbing = false
+    @State private var scrubBaseValue: Double = 0
+
     private var totalSteps: Double { (range.upperBound - range.lowerBound) / step }
     private var bigStep: Double { totalSteps > 50 ? step * 10 : step * 5 }
     private var showBigSteppers: Bool { totalSteps > 10 }
 
     private func nudge(by delta: Double) {
         let raw = value + delta
+        let snapped = range.lowerBound + round((raw - range.lowerBound) / step) * step
+        value = min(range.upperBound, max(range.lowerBound, snapped))
+    }
+
+    private func scrubTo(translation: CGFloat) {
+        let rangeLength = range.upperBound - range.lowerBound
+        let sensitivity = rangeLength / 200.0
+        let raw = scrubBaseValue + Double(translation) * sensitivity
         let snapped = range.lowerBound + round((raw - range.lowerBound) / step) * step
         value = min(range.upperBound, max(range.lowerBound, snapped))
     }
@@ -48,8 +59,33 @@ struct LabeledSlider: View {
                 Text(formattedValue)
                     .font(.system(size: 18, weight: .medium))
                     .monospacedDigit()
-                    .foregroundColor(color)
+                    .foregroundColor(isScrubbing ? .primary : color)
                     .frame(minWidth: 38, alignment: .center)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(isScrubbing ? color.opacity(0.18) : Color.clear)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 5)
+                                    .stroke(isScrubbing ? color.opacity(0.5) : color.opacity(0.25),
+                                            lineWidth: 1)
+                            )
+                    )
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 4)
+                            .onChanged { drag in
+                                if !isScrubbing {
+                                    isScrubbing = true
+                                    scrubBaseValue = value
+                                }
+                                scrubTo(translation: drag.translation.width)
+                            }
+                            .onEnded { _ in
+                                isScrubbing = false
+                            }
+                    )
                 NudgeButton("+", color: color) { nudge(by: step) }
                 if showBigSteppers {
                     NudgeButton("++", color: color) { nudge(by: bigStep) }
