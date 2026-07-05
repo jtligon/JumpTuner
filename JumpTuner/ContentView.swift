@@ -107,7 +107,7 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .sheet(item: $selectedQRPreset) { preset in
-            PresetQRView(preset: preset)
+            PresetQRView(preset: preset, onImport: { store.save($0) })
         }
         .sheet(item: $selectedCodePreset) { preset in
             CodeExportView(preset: preset)
