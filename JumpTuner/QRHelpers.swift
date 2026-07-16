@@ -133,11 +133,11 @@ struct QRScannerSheet: View {
                 Canvas { ctx, size in
                     ctx.fill(Path(CGRect(origin: .zero, size: size)),
                              with: .color(.black.opacity(0.5)))
-                    let hole = Path(RoundedRectangle(cornerRadius: 14).path(in: CGRect(
+                    let hole = RoundedRectangle(cornerRadius: 14).path(in: CGRect(
                         x: (size.width  - side) / 2,
                         y: (size.height - side) / 2,
                         width: side, height: side
-                    )))
+                    ))
                     ctx.blendMode = .clear
                     ctx.fill(hole, with: .color(.white))
                 }
