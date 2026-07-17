@@ -88,6 +88,7 @@ struct JumpPreviewView: View {
     @State private var looping: Bool = false
     @State private var animating: Bool = false
     @State private var autoRunning: Bool = false
+    @State private var showingPlatforms: Bool = false
 
     @State private var scene: JumpScene = {
         let s = JumpScene()
@@ -130,6 +131,11 @@ struct JumpPreviewView: View {
                         } else {
                             scene.stopAutoRun()
                         }
+                    }
+
+                    RailToggle(systemImage: "square.3.layers.3d", label: "Platforms", isOn: showingPlatforms) {
+                        showingPlatforms.toggle()
+                        scene.showPlatforms = showingPlatforms
                     }
 
                     ControllerButton(isPlaying: animating || autoRunning) {
