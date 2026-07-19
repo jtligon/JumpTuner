@@ -95,6 +95,12 @@ private let helpSections: [HelpSection] = [
             HelpItem(name: "Bounce count",
                      description: "How many rubber bounces occur after the main landing. Each bounce is 25% the height of the previous one, so higher counts produce progressively tinier hops.",
                      tip: "Requires Rubber bounce to be enabled."),
+            HelpItem(name: "Double jump",
+                     description: "Triggers a second jump at the apex of the first. In the preview this fires automatically so you can evaluate how the two-jump arc looks and feels. Height of the second jump is set by DJ height factor.",
+                     tip: "Classic double jump: factor 0.5–0.7. Equal-height wall-jump feel: factor 0.9–1.0."),
+            HelpItem(name: "DJ height factor",
+                     description: "How high the second jump travels as a fraction of the first jump height, measured from the first apex. 0.6 means the second jump adds 60% of the original height above the first peak.",
+                     tip: "Requires Double jump to be enabled."),
         ]
     ),
 ]

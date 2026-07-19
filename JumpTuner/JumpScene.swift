@@ -244,6 +244,20 @@ final class JumpScene: SKScene {
         let ascentDuration  = params.ascentFrames / 60.0
         let descentDuration = params.descentFrames / 60.0
 
+        // Compute second-jump derived values up front.
+        let djFactor = CGFloat(params.doubleJumpHeightFactor)
+        let peak2Y = peakY + scaledHeight() * djFactor
+
+        // Descent starts from peak2Y if double jump is active, so scale duration
+        // with sqrt of the total fall-height ratio to preserve perceived speed.
+        let effectiveDescentDuration: TimeInterval
+        if params.features.doubleJump {
+            let ratio = Double((peak2Y - restY) / scaledHeight())
+            effectiveDescentDuration = descentDuration * sqrt(ratio)
+        } else {
+            effectiveDescentDuration = descentDuration
+        }
+
         var steps: [SKAction] = [
             // Squat anticipation
             spawnPhaseLabels(.squat),
@@ -265,11 +279,31 @@ final class JumpScene: SKScene {
             spawnPhaseLabels(.apex),
             setPhase(.apex),
             .wait(forDuration: config.apexDuration),
+        ]
 
+        // Double jump: mid-air compress → launch → rise to second peak → brief apex
+        if params.features.doubleJump {
+            let asc2Duration = max(2.0 / 60.0, ascentDuration * sqrt(Double(djFactor)))
+            let squat2Dur    = max(2.0 / 60.0, config.squatDuration * 0.5)
+            steps += [
+                setPhase(.squat),
+                scaleGroup(x: config.squatScaleX, y: config.squatScaleY, duration: squat2Dur),
+                setPhase(.ascending),
+                scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+                SKAction.group([
+                    moveTo(y: peak2Y, duration: asc2Duration, timing: .easeOut),
+                    scaleGroup(x: 1, y: 1, duration: asc2Duration * 0.4)
+                ]),
+                setPhase(.apex),
+                .wait(forDuration: config.apexDuration * 0.5),
+            ]
+        }
+
+        steps += [
             // Descent: position eases in (accelerates)
             spawnPhaseLabels(.descending),
             setPhase(.descending),
-            moveTo(y: restY, duration: descentDuration, timing: .easeIn),
+            moveTo(y: restY, duration: effectiveDescentDuration, timing: .easeIn),
 
             // Land squash
             spawnPhaseLabels(.landing),

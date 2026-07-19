@@ -49,6 +49,11 @@ struct JumpFeatures: Codable, Equatable {
     /// landing squashes less. Number of bounces controlled by
     /// `JumpParams.bounceCount`.
     var rubberBounce: Bool = false
+
+    /// Allows a second jump while already airborne, triggered automatically
+    /// at the apex of the first jump in the preview. Height of the second
+    /// jump is controlled by `JumpParams.doubleJumpHeightFactor`.
+    var doubleJump: Bool = false
 }
 
 // MARK: - JumpParams
@@ -143,7 +148,12 @@ struct JumpParams: Codable, Equatable {
     /// proportionally less. Requires `features.rubberBounce`. Range: 1–6.
     var bounceCount: Double = 2
 
-    /// The five boolean feel toggles.
+    /// Height of the second jump as a fraction of the first jump height,
+    /// measured from the apex of the first jump.
+    /// 1.0 = second jump reaches 2× the first peak. Range: 0.1–1.0.
+    var doubleJumpHeightFactor: Double = 0.60
+
+    /// The feature toggles.
     var features: JumpFeatures = JumpFeatures()
 
     // MARK: Presets
@@ -170,7 +180,8 @@ struct JumpParams: Codable, Equatable {
             fallMult:       Double(Int.random(in: 10...28)) / 10.0,
             apexGravFactor: Double(Int.random(in: 2...18)) / 20.0,
             floatFrames:    Double(Int.random(in: 0...30)),
-            bounceCount:    Double(Int.random(in: 1...4)),
+            bounceCount:             Double(Int.random(in: 1...4)),
+            doubleJumpHeightFactor:  Double(Int.random(in: 2...9)) / 10.0,
             features: JumpFeatures(
                 coyoteTime:   Bool.random(),
                 jumpBuffer:   Bool.random(),
@@ -178,7 +189,8 @@ struct JumpParams: Codable, Equatable {
                 asymGrav:     Bool.random(),
                 apexGrav:     Bool.random(),
                 floating:     Bool.random(),
-                rubberBounce: Bool.random()
+                rubberBounce: Bool.random(),
+                doubleJump:   Bool.random()
             )
         )
     }
