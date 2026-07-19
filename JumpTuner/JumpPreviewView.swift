@@ -81,6 +81,7 @@ struct JumpPreviewView: View {
     @Binding var showParamText: Bool
 
     @State private var looping: Bool = false
+    @State private var showingPlatforms: Bool = false
     @State private var animating: Bool = false
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
@@ -126,6 +127,33 @@ struct JumpPreviewView: View {
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(
                                         looping ? Color.groundColor : .white.opacity(0.7)
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        // Platforms toggle
+                        Button {
+                            showingPlatforms.toggle()
+                            scene.showPlatforms = showingPlatforms
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(showingPlatforms
+                                          ? SectionTheme.feel.opacity(0.3)
+                                          : Color.white.opacity(0.12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(showingPlatforms
+                                                    ? SectionTheme.feel
+                                                    : Color.white.opacity(0.3),
+                                                    lineWidth: 1.5)
+                                    )
+                                    .frame(width: 42, height: 32)
+                                Image(systemName: "square.3.layers.3d")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(
+                                        showingPlatforms ? SectionTheme.feel : .white.opacity(0.7)
                                     )
                             }
                         }
