@@ -18,6 +18,29 @@ final class JumpScene: SKScene {
     var isLooping: Bool = false
     var showFloatingText: Bool = true
 
+    var isAutoRunner: Bool = false {
+        didSet {
+            guard oldValue != isAutoRunner else { return }
+            if isAutoRunner {
+                character?.position.x = autoRunStartX
+                lastAutoRunTime = nil
+                runCycleTime = 0
+                lastRunPhase = .idle
+            } else {
+                lastAutoRunTime = nil
+                if !isJumping {
+                    character?.position.x = characterX
+                    characterNode?.setPhase(.idle)
+                }
+            }
+        }
+    }
+
+    private let autoRunSpeed: CGFloat = 80  // points per second
+    private var lastAutoRunTime: TimeInterval?
+    private var runCycleTime: TimeInterval = 0
+    private var lastRunPhase: JumpPhase = .idle
+
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
     private var isJumping = false
@@ -40,6 +63,35 @@ final class JumpScene: SKScene {
         repositionNodes()
     }
 
+    override func update(_ currentTime: TimeInterval) {
+        guard isAutoRunner, character != nil, size.width > 0 else {
+            lastAutoRunTime = nil
+            return
+        }
+        let dt: TimeInterval
+        if let last = lastAutoRunTime {
+            dt = min(currentTime - last, 0.05)
+        } else {
+            dt = 0
+        }
+        lastAutoRunTime = currentTime
+
+        var newX = character.position.x + autoRunSpeed * CGFloat(dt)
+        if newX > autoRunEndX { newX = autoRunStartX }
+        character.position.x = newX
+
+        if !isJumping {
+            runCycleTime += dt
+            let half: TimeInterval = 0.14
+            let phase = runCycleTime.truncatingRemainder(dividingBy: half * 2)
+            let desired: JumpPhase = phase < half ? .ascending : .descending
+            if desired != lastRunPhase {
+                lastRunPhase = desired
+                characterNode.setPhase(desired)
+            }
+        }
+    }
+
     // MARK: - Public interface
 
     func triggerJump() {
@@ -55,10 +107,11 @@ final class JumpScene: SKScene {
         characterNode.removeAllActions()
         isJumping = false
         isLooping = false
-        character.position = CGPoint(x: characterX, y: characterRestY)
+        let x = isAutoRunner ? character.position.x : characterX
+        character.position = CGPoint(x: x, y: characterRestY)
         character.xScale = 1
         character.yScale = 1
-        characterNode.setPhase(.idle)
+        if !isAutoRunner { characterNode.setPhase(.idle) }
     }
 
     func setCharacter(_ skin: CharacterSkin) {
@@ -68,12 +121,15 @@ final class JumpScene: SKScene {
         character.addChild(newNode)
         characterNode = newNode
         characterNode.setPhase(.idle)
+        lastRunPhase = .idle
         if isJumping { restartJump() }
     }
 
     // MARK: - Layout helpers
 
     private var characterX: CGFloat { size.width * 0.3 }
+    private var autoRunStartX: CGFloat { size.width * 0.10 }
+    private var autoRunEndX: CGFloat   { size.width * 0.88 }
     // character origin at feet level; visual nodes have feet at y=0 in local space
     private var characterRestY: CGFloat { groundY + 2 }
 
@@ -85,6 +141,7 @@ final class JumpScene: SKScene {
 
     private func repositionNodes() {
         groundNode?.position = CGPoint(x: size.width / 2, y: groundY)
+        guard !isAutoRunner else { return }
         if !isJumping {
             character?.position = CGPoint(x: characterX, y: characterRestY)
         } else {
@@ -183,7 +240,8 @@ final class JumpScene: SKScene {
         characterNode.removeAllActions()
         character.xScale = 1
         character.yScale = 1
-        character.position = CGPoint(x: characterX, y: characterRestY)
+        let x = isAutoRunner ? character.position.x : characterX
+        character.position = CGPoint(x: x, y: characterRestY)
         startJump()
     }
 

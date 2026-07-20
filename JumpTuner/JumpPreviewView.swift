@@ -81,6 +81,7 @@ struct JumpPreviewView: View {
     @Binding var showParamText: Bool
 
     @State private var looping: Bool = false
+    @State private var autoRunning: Bool = false
     @State private var animating: Bool = false
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
@@ -104,6 +105,33 @@ struct JumpPreviewView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     // Row 1: playback controls
                     HStack(spacing: 10) {
+                        // Auto-runner toggle
+                        Button {
+                            autoRunning.toggle()
+                            scene.isAutoRunner = autoRunning
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(autoRunning
+                                          ? SectionTheme.timing.opacity(0.3)
+                                          : Color.white.opacity(0.12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(autoRunning
+                                                    ? SectionTheme.timing
+                                                    : Color.white.opacity(0.3),
+                                                    lineWidth: 1.5)
+                                    )
+                                    .frame(width: 42, height: 32)
+                                Image(systemName: "figure.run")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(
+                                        autoRunning ? SectionTheme.timing : .white.opacity(0.7)
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
                         // Loop toggle
                         Button {
                             looping.toggle()
