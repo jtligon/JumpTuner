@@ -21,6 +21,7 @@ final class JumpScene: SKScene {
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
     private var isJumping = false
+    private var hasUsedDoubleJump = false
     private let groundY: CGFloat = 36
     private let characterSize = CGSize(width: 36, height: 48)
 
@@ -44,7 +45,11 @@ final class JumpScene: SKScene {
 
     func triggerJump() {
         if isJumping {
-            restartJump()
+            if params.features.doubleJump && !hasUsedDoubleJump {
+                performDoubleJump()
+            } else {
+                restartJump()
+            }
         } else {
             startJump()
         }
@@ -54,6 +59,7 @@ final class JumpScene: SKScene {
         character.removeAllActions()
         characterNode.removeAllActions()
         isJumping = false
+        hasUsedDoubleJump = false
         isLooping = false
         character.position = CGPoint(x: characterX, y: characterRestY)
         character.xScale = 1
@@ -187,6 +193,22 @@ final class JumpScene: SKScene {
         startJump()
     }
 
+    private func performDoubleJump() {
+        hasUsedDoubleJump = true
+        let config = JumpPhysicsConfig(params: params, scaledHeight: scaledHeight())
+        let currentY = character.position.y
+        let restY = characterRestY
+        let extraHeight = scaledHeight() * CGFloat(params.doubleJumpHeightFactor)
+        let peakY = currentY + extraHeight
+
+        character.removeAllActions()
+        characterNode.removeAllActions()
+        character.xScale = 1
+        character.yScale = 1
+
+        runDoubleJumpSequence(config: config, startY: currentY, restY: restY, peakY: peakY)
+    }
+
     private func runJumpSequence(config: JumpPhysicsConfig, restY: CGFloat, peakY: CGFloat) {
         func setPhase(_ p: JumpPhase) -> SKAction {
             .run { [weak self] in self?.characterNode.setPhase(p) }
@@ -277,6 +299,102 @@ final class JumpScene: SKScene {
             .run { [weak self] in
                 guard let self else { return }
                 self.isJumping = false
+                if self.isLooping {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+                        self?.startJump()
+                    }
+                }
+            }
+        ]
+
+        character.run(.sequence(steps), withKey: "jump")
+    }
+
+    private func runDoubleJumpSequence(config: JumpPhysicsConfig, startY: CGFloat, restY: CGFloat, peakY: CGFloat) {
+        func setPhase(_ p: JumpPhase) -> SKAction {
+            .run { [weak self] in self?.characterNode.setPhase(p) }
+        }
+        func scaleGroup(x: CGFloat, y: CGFloat, duration: TimeInterval) -> SKAction {
+            .group([.scaleX(to: x, duration: duration), .scaleY(to: y, duration: duration)])
+        }
+        func moveTo(y: CGFloat, duration: TimeInterval, timing: SKActionTimingMode) -> SKAction {
+            let a = SKAction.moveTo(y: y, duration: duration)
+            a.timingMode = timing
+            return a
+        }
+
+        let frameDur: TimeInterval = 2.0 / 60.0
+        let fullHeight = scaledHeight()
+        // Scale ascent duration by how far this jump actually travels vs. a ground jump
+        let ascentDistance = max(peakY - startY, 0)
+        let ascentFraction = fullHeight > 0 ? Double(ascentDistance / fullHeight) : 0
+        let ascentDuration  = max(frameDur, params.ascentFrames / 60.0 * ascentFraction)
+        let descentDuration = params.descentFrames / 60.0
+
+        var steps: [SKAction] = [
+            // Brief mid-air launch stretch (no squat — character is airborne)
+            spawnPhaseLabels(.ascending),
+            setPhase(.ascending),
+            scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+
+            // Rise to double-jump peak
+            SKAction.group([
+                moveTo(y: peakY, duration: ascentDuration, timing: .easeOut),
+                scaleGroup(x: 1, y: 1, duration: ascentDuration * 0.4)
+            ]),
+
+            // Apex float
+            spawnPhaseLabels(.apex),
+            setPhase(.apex),
+            .wait(forDuration: config.apexDuration),
+
+            // Descent back to ground
+            spawnPhaseLabels(.descending),
+            setPhase(.descending),
+            moveTo(y: restY, duration: descentDuration, timing: .easeIn),
+
+            // Landing squash
+            spawnPhaseLabels(.landing),
+            setPhase(.landing),
+            .run { [weak self] in self?.fireHaptic() },
+            scaleGroup(x: config.landScaleX, y: config.landScaleY, duration: frameDur),
+            scaleGroup(x: 1, y: 1, duration: config.landingDuration),
+        ]
+
+        if params.features.rubberBounce {
+            let baseDeform = 1.0 - params.landScale
+            let fullAscentDuration = params.ascentFrames / 60.0
+            let fullDescentDuration = params.descentFrames / 60.0
+
+            for i in 0..<Int(params.bounceCount) {
+                let hr = CGFloat(pow(0.25, Double(i + 1)))
+                let ds = Double(pow(0.5, Double(i + 1)))
+                let bounceY = restY + fullHeight * hr
+                let bAscent = max(frameDur, fullAscentDuration * ds)
+                let bDescent = max(frameDur, fullDescentDuration * ds)
+                let bLandingDur = max(frameDur, config.landingDuration * ds)
+                let bSquashY = CGFloat(1.0 - baseDeform * Double(hr))
+                let bSquashX = 1.0 / bSquashY
+
+                steps += [
+                    setPhase(.ascending),
+                    moveTo(y: bounceY, duration: bAscent,  timing: .easeOut),
+                    setPhase(.descending),
+                    moveTo(y: restY,   duration: bDescent, timing: .easeIn),
+                    setPhase(.landing),
+                    .run { [weak self] in self?.fireHaptic() },
+                    scaleGroup(x: bSquashX, y: bSquashY, duration: frameDur),
+                    scaleGroup(x: 1,        y: 1,        duration: bLandingDur),
+                ]
+            }
+        }
+
+        steps += [
+            setPhase(.idle),
+            .run { [weak self] in
+                guard let self else { return }
+                self.isJumping = false
+                self.hasUsedDoubleJump = false
                 if self.isLooping {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
                         self?.startJump()
