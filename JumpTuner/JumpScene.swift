@@ -16,6 +16,7 @@ final class JumpScene: SKScene {
 
     var params: JumpParams = .defaults { didSet { if isJumping { restartJump() } } }
     var isLooping: Bool = false
+    var isAutoRunning: Bool = false
     var showFloatingText: Bool = true
 
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
@@ -24,6 +25,8 @@ final class JumpScene: SKScene {
     private var hasUsedDoubleJump = false
     private let groundY: CGFloat = 36
     private let characterSize = CGSize(width: 36, height: 48)
+    private var lastUpdateTime: TimeInterval = 0
+    private let autoRunSpeed: CGFloat = 120  // pts/sec
 
     // MARK: - Scene setup
 
@@ -41,6 +44,17 @@ final class JumpScene: SKScene {
         repositionNodes()
     }
 
+    override func update(_ currentTime: TimeInterval) {
+        guard isAutoRunning, character != nil else { return }
+        defer { lastUpdateTime = currentTime }
+        guard lastUpdateTime > 0 else { return }
+        let dt = CGFloat(currentTime - lastUpdateTime)
+        character.position.x += dt * autoRunSpeed
+        if character.position.x > size.width + 20 {
+            character.position.x = -20
+        }
+    }
+
     // MARK: - Public interface
 
     func triggerJump() {
@@ -52,6 +66,18 @@ final class JumpScene: SKScene {
             }
         } else {
             startJump()
+        }
+    }
+
+    func startAutoRun() {
+        isAutoRunning = true
+        lastUpdateTime = 0
+    }
+
+    func stopAutoRun() {
+        isAutoRunning = false
+        if !isJumping {
+            character.position.x = characterX
         }
     }
 
@@ -91,6 +117,7 @@ final class JumpScene: SKScene {
 
     private func repositionNodes() {
         groundNode?.position = CGPoint(x: size.width / 2, y: groundY)
+        guard !isAutoRunning else { return }
         if !isJumping {
             character?.position = CGPoint(x: characterX, y: characterRestY)
         } else {
@@ -189,7 +216,8 @@ final class JumpScene: SKScene {
         characterNode.removeAllActions()
         character.xScale = 1
         character.yScale = 1
-        character.position = CGPoint(x: characterX, y: characterRestY)
+        let xPos = isAutoRunning ? character.position.x : characterX
+        character.position = CGPoint(x: xPos, y: characterRestY)
         startJump()
     }
 
