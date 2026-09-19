@@ -102,8 +102,9 @@ struct JumpParamsTests {
         #expect(p.landScale     >= 0.3  && p.landScale     <= 0.9)
         #expect((1...8).contains(p.coyoteFrames))
         #expect((1...8).contains(p.bufferFrames))
-        #expect(p.fallMult       >= 1.0 && p.fallMult       <= 2.8)
-        #expect(p.apexGravFactor >= 0.1 && p.apexGravFactor <= 0.9)
+        #expect(p.fallMult               >= 1.0  && p.fallMult               <= 2.8)
+        #expect(p.apexGravFactor         >= 0.1  && p.apexGravFactor         <= 0.9)
+        #expect(p.doubleJumpHeightFactor >= 0.25 && p.doubleJumpHeightFactor <= 1.0)
     }
 
     @Test func codableRoundtrip() throws {
