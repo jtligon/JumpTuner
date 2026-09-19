@@ -82,6 +82,7 @@ struct JumpPreviewView: View {
 
     @State private var looping: Bool = false
     @State private var animating: Bool = false
+    @State private var autoRunning: Bool = false
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
     @State private var showingPhotoPicker = false
@@ -131,10 +132,44 @@ struct JumpPreviewView: View {
                         }
                         .buttonStyle(.plain)
 
-                        // Play / stop
-                        ControllerButton(isPlaying: animating) {
-                            if animating {
+                        // Auto-runner toggle
+                        Button {
+                            autoRunning.toggle()
+                            if autoRunning {
                                 animating = false
+                                scene.startAutoRun()
+                            } else {
+                                scene.stopAutoRun()
+                            }
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(autoRunning
+                                          ? Color.groundColor.opacity(0.3)
+                                          : Color.white.opacity(0.12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(autoRunning
+                                                    ? Color.groundColor
+                                                    : Color.white.opacity(0.3),
+                                                    lineWidth: 1.5)
+                                    )
+                                    .frame(width: 42, height: 32)
+                                Image(systemName: "figure.run")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(
+                                        autoRunning ? Color.groundColor : .white.opacity(0.7)
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        // Play / stop
+                        ControllerButton(isPlaying: animating || autoRunning) {
+                            if animating || autoRunning {
+                                animating = false
+                                autoRunning = false
+                                scene.stopAutoRun()
                                 scene.stopJumping()
                             } else {
                                 animating = true
