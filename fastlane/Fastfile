@@ -37,6 +37,76 @@ platform :ios do
     upload_to_testflight
   end
 
+  # ── App Store asset lanes ────────────────────────────────────────────────────
+
+  desc "Umbrella lane: generate all App Store assets (screenshots + marketing GIFs)"
+  lane :store_assets do
+    UI.message("Generating App Store screenshots…")
+    screenshots
+
+    UI.message("Generating marketing GIFs…")
+    marketing_gifs
+
+    UI.success("All store assets written to fastlane/screenshots and fastlane/marketing")
+  end
+
+  desc "Capture App Store screenshots on all required device sizes via snapshot"
+  lane :screenshots do
+    # snapshot requires a JumpTunerUITests UI test target with snapshot() calls.
+    # If the target does not exist yet this lane prints instructions and exits.
+    targets = sh("xcodebuild -list -project JumpTuner.xcodeproj 2>/dev/null | grep -i 'UITest' || true").strip
+    if targets.empty?
+      UI.important <<~MSG
+        No UI test target found.
+        To enable automated screenshots:
+          1. In Xcode: File → New → Target → UI Testing Bundle → "JumpTunerUITests"
+          2. Add `import XCTest` and call `snapshot("01_home")` at key moments.
+          3. Re-run: bundle exec fastlane screenshots
+      MSG
+      next
+    end
+
+    capture_ios_screenshots(
+      scheme:                    "JumpTuner",
+      output_directory:          "fastlane/screenshots",
+      clear_previous_screenshots: true,
+      override_status_bar:       true,
+      reinstall_app:             true
+    )
+  end
+
+  desc "Record a simulator screen capture for each device and convert to animated GIF"
+  lane :marketing_gifs do
+    device_configs = [
+      { name: "iPhone 16 Pro Max", label: "6_9_inch" },
+      { name: "iPhone 16 Pro",     label: "6_3_inch" }
+    ]
+    duration   = ENV.fetch("GIF_DURATION", "10").to_i
+    output_dir = File.expand_path("../fastlane/marketing", __dir__)
+    script     = File.expand_path("../scripts/record_gif.sh", __dir__)
+
+    FileUtils.mkdir_p(output_dir)
+
+    device_configs.each do |cfg|
+      UI.message("Recording #{cfg[:name]}…")
+      sh(
+        "DERIVED_DATA_PATH=/tmp/JumpTunerDerivedData " \
+        "bash '#{script}' '#{cfg[:name]}' #{duration} '#{output_dir}'",
+        error_callback: ->(result) {
+          UI.error("Recording failed for #{cfg[:name]}: #{result}")
+        }
+      )
+    end
+
+    gifs = Dir.glob("#{output_dir}/*.gif")
+    if gifs.empty?
+      UI.important("No GIFs were produced. Ensure ffmpeg is installed (brew install ffmpeg).")
+    else
+      UI.success("GIFs created:")
+      gifs.each { |g| UI.message("  #{g}") }
+    end
+  end
+
   desc "Build a PR branch and upload to TestFlight for review"
   lane :pr_beta do
     pr_number = ENV.fetch("PR_NUMBER", "0")

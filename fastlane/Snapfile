@@ -1,0 +1,37 @@
+# Snapfile — configuration for `fastlane snapshot`
+#
+# Snapshot drives automated App Store screenshot capture via a UI test target.
+# See: https://docs.fastlane.tools/actions/snapshot/
+#
+# To set up automated screenshots, add a JumpTunerUITests target in Xcode,
+# call `snapshot("01_home")` at each desired moment in the UI tests, then run:
+#   bundle exec fastlane screenshots
+
+# Target device sizes required by App Store Connect.
+# 6.9" covers iPhone 16 Pro Max / iPhone 16 Plus (required).
+# 6.1" covers iPhone 16 Pro / iPhone 16 (optional but recommended).
+# 4.7" covers iPhone SE 3rd-gen (required for users on smaller devices).
+devices([
+  "iPhone 16 Pro Max",
+  "iPhone 16 Pro",
+  "iPhone SE (3rd generation)"
+])
+
+languages(["en-US"])
+
+scheme("JumpTuner")
+
+# Output directory (relative to the project root)
+output_directory("./fastlane/screenshots")
+
+clear_previous_screenshots(true)
+
+# Keep the simulator alive between runs for faster iteration
+reinstall_app(true)
+erase_simulator(false)
+
+# Override the status bar so screenshots look polished
+override_status_bar(true)
+
+# Filename prefix for each screenshot
+output_files("png")
