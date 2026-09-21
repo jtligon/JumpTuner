@@ -24,6 +24,10 @@ final class JumpScene: SKScene {
     private let groundY: CGFloat = 36
     private let characterSize = CGSize(width: 36, height: 48)
 
+    // Horizontal movement (landscape controller)
+    private var lateralVelocity: CGFloat = 0
+    private var lastUpdateTime: TimeInterval = 0
+
     // MARK: - Scene setup
 
     override func didMove(to view: SKView) {
@@ -50,6 +54,12 @@ final class JumpScene: SKScene {
         }
     }
 
+    /// Sets horizontal movement speed for the landscape on-screen controller.
+    /// Pass 0 to stop. Positive = right, negative = left.
+    func setMoving(velocity: CGFloat) {
+        lateralVelocity = velocity
+    }
+
     func stopJumping() {
         character.removeAllActions()
         characterNode.removeAllActions()
@@ -69,6 +79,17 @@ final class JumpScene: SKScene {
         characterNode = newNode
         characterNode.setPhase(.idle)
         if isJumping { restartJump() }
+    }
+
+    // MARK: - Update loop
+
+    override func update(_ currentTime: TimeInterval) {
+        guard lateralVelocity != 0, let character else { return }
+        let dt = lastUpdateTime == 0 ? 0 : currentTime - lastUpdateTime
+        lastUpdateTime = currentTime
+        guard dt > 0 && dt < 0.1 else { return }
+        let raw = character.position.x + lateralVelocity * CGFloat(dt)
+        character.position.x = max(0, min(size.width, raw))
     }
 
     // MARK: - Layout helpers
