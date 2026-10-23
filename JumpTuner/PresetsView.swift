@@ -8,6 +8,7 @@ struct PresetsView: View {
     @Binding var selectedQRPreset: Preset?
     @Binding var selectedCodePreset: Preset?
     @State private var presetName = ""
+    @State private var showQRImport = false
 
     var body: some View {
         CollapsibleSection(title: "Presets", icon: "star.fill",
@@ -26,9 +27,20 @@ struct PresetsView: View {
                 .tint(SectionTheme.presets)
                 .disabled(presetName.isEmpty)
                 .font(.system(size: 13))
+                Button {
+                    showQRImport = true
+                } label: {
+                    Image(systemName: "qrcode.viewfinder")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .buttonStyle(.bordered)
+                .tint(SectionTheme.presets)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
+            .sheet(isPresented: $showQRImport) {
+                QRImportSheet(store: store, params: $params)
+            }
 
             if store.presets.isEmpty {
                 Text("No presets saved yet")
