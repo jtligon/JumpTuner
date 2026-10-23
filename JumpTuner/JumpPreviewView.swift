@@ -86,6 +86,9 @@ struct JumpPreviewView: View {
     @State private var customSkins: [CharacterSkin] = []
     @State private var showingPhotoPicker = false
 
+    @Environment(\.horizontalSizeClass) private var hSizeClass
+    @Environment(\.verticalSizeClass) private var vSizeClass
+
     @State private var scene: JumpScene = {
         let s = JumpScene()
         s.scaleMode = .resizeFill
@@ -94,71 +97,96 @@ struct JumpPreviewView: View {
 
     private var allSkins: [CharacterSkin] { CharacterSkin.builtIn + customSkins }
 
+    // Landscape when width is compact + height is compact (iPhone landscape)
+    // or when width is regular (iPad, but that stays portrait-style)
+    private var isLandscape: Bool {
+        vSizeClass == .compact
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .bottom) {
                 SpriteView(scene: scene)
                     .ignoresSafeArea()
 
-                // Controls — top bar
-                VStack(alignment: .leading, spacing: 8) {
-                    // Row 1: playback controls
-                    HStack(spacing: 10) {
-                        // Loop toggle
-                        Button {
-                            looping.toggle()
-                            scene.isLooping = looping
-                        } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(looping
-                                          ? Color.groundColor.opacity(0.3)
-                                          : Color.white.opacity(0.12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(looping
-                                                    ? Color.groundColor
-                                                    : Color.white.opacity(0.3),
-                                                    lineWidth: 1.5)
-                                    )
-                                    .frame(width: 42, height: 32)
-                                Image(systemName: "repeat")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(
-                                        looping ? Color.groundColor : .white.opacity(0.7)
-                                    )
-                            }
+                if isLandscape {
+                    // Landscape: on-screen controller overlay
+                    OnScreenControllerView(
+                        onMove: { normalizedX in
+                            let speed: CGFloat = 220
+                            scene.setMoving(velocity: normalizedX * speed)
+                        },
+                        onJump: {
+                            animating = true
+                            scene.triggerJump()
                         }
-                        .buttonStyle(.plain)
-
-                        // Play / stop
-                        ControllerButton(isPlaying: animating) {
-                            if animating {
-                                animating = false
-                                scene.stopJumping()
-                            } else {
-                                animating = true
-                                scene.triggerJump()
+                    )
+                    .ignoresSafeArea()
+                } else {
+                    // Portrait: existing top controls
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Row 1: playback controls
+                        HStack(spacing: 10) {
+                            // Loop toggle
+                            Button {
+                                looping.toggle()
+                                scene.isLooping = looping
+                            } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(looping
+                                              ? Color.groundColor.opacity(0.3)
+                                              : Color.white.opacity(0.12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(looping
+                                                        ? Color.groundColor
+                                                        : Color.white.opacity(0.3),
+                                                        lineWidth: 1.5)
+                                        )
+                                        .frame(width: 42, height: 32)
+                                    Image(systemName: "repeat")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(
+                                            looping ? Color.groundColor : .white.opacity(0.7)
+                                        )
+                                }
                             }
+                            .buttonStyle(.plain)
+
+                            // Play / stop
+                            ControllerButton(isPlaying: animating) {
+                                if animating {
+                                    animating = false
+                                    scene.stopJumping()
+                                } else {
+                                    animating = true
+                                    scene.triggerJump()
+                                }
+                            }
+
+                            Spacer()
                         }
 
-                        Spacer()
+                        // Row 2: character picker — wraps horizontally
+                        ChipFlowView(allSkins: allSkins, selectedSkin: selectedSkin) { skin in
+                            selectedSkin = skin
+                            scene.setCharacter(skin)
+                        } onAdd: {
+                            showingPhotoPicker = true
+                        }
                     }
-
-                    // Row 2: character picker — wraps horizontally
-                    ChipFlowView(allSkins: allSkins, selectedSkin: selectedSkin) { skin in
-                        selectedSkin = skin
-                        scene.setCharacter(skin)
-                    } onAdd: {
-                        showingPhotoPicker = true
-                    }
+                    .padding(.leading, 16)
+                    .padding(.trailing, 16)
+                    .padding(.top, 56)
+                    Spacer()
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, 16)
-                .padding(.top, 56)
-                Spacer()
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .onChange(of: isLandscape) {
+                // Stop lateral movement when returning to portrait
+                if !isLandscape { scene.setMoving(velocity: 0) }
+            }
         }
         .ignoresSafeArea()
         .characterPhotoFlow(isPresented: $showingPhotoPicker) { newSkin in

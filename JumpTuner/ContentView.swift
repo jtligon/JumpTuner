@@ -12,6 +12,10 @@ struct ContentView: View {
     @State private var jumpTrigger        = 0
     @State private var showFloatingText   = true
 
+    @Environment(\.verticalSizeClass) private var vSizeClass
+
+    private var isLandscape: Bool { vSizeClass == .compact }
+
     private let drawerWidth: CGFloat = 260
 
     var body: some View {
@@ -22,38 +26,41 @@ struct ContentView: View {
                 JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger, showParamText: $showFloatingText)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        if !drawerOpen { jumpTrigger += 1 }
+                        // Portrait only: tap to jump when drawer is closed
+                        if !isLandscape && !drawerOpen { jumpTrigger += 1 }
                     }
 
-                // Tab to open/close the drawer, pinned to the right edge
-                // when the drawer is closed, left edge of drawer when open
-                VStack {
-                    Spacer()
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            drawerOpen.toggle()
+                if !isLandscape {
+                    // Drawer toggle tab — portrait only
+                    VStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                drawerOpen.toggle()
+                            }
+                        } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                    )
+                                    .frame(width: 28, height: 56)
+                                Image(systemName: drawerOpen ? "chevron.right" : "chevron.left")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
                         }
-                    } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(.ultraThinMaterial)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                                )
-                                .frame(width: 28, height: 56)
-                            Image(systemName: drawerOpen ? "chevron.right" : "chevron.left")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.8))
-                        }
+                        .buttonStyle(.plain)
+                        .offset(x: drawerOpen ? -(drawerWidth) : 0)
+                        Spacer()
                     }
-                    .buttonStyle(.plain)
-                    .offset(x: drawerOpen ? -(drawerWidth) : 0)
-                    Spacer()
+                    .zIndex(10)
                 }
-                .zIndex(10)
 
-                // Side drawer
+                // Side drawer — hidden in landscape; full screen belongs to the controller
+                if !isLandscape {
                 VStack(spacing: 0) {
                     // Header
                     HStack {
@@ -104,6 +111,7 @@ struct ContentView: View {
                 .frame(width: drawerWidth)
                 .adaptiveGlassBackground()
                 .offset(x: drawerOpen ? 0 : drawerWidth)
+                } // end if !isLandscape drawer
             }
         }
         .ignoresSafeArea()
