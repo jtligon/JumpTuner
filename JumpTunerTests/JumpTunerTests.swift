@@ -18,6 +18,7 @@ struct JumpFeaturesTests {
         #expect(f.variableJump == true)
         #expect(f.asymGrav == true)
         #expect(f.apexGrav == true)
+        #expect(f.doubleJump == false)
     }
 
     @Test func equatableSame() {
@@ -62,6 +63,7 @@ struct JumpParamsTests {
         #expect(p.bufferFrames   == 4)
         #expect(p.fallMult       == 1.6)
         #expect(p.apexGravFactor == 0.40)
+        #expect(p.doubleJumpScale == 0.65)
         #expect(p.features       == JumpFeatures())
     }
 
@@ -102,8 +104,9 @@ struct JumpParamsTests {
         #expect(p.landScale     >= 0.3  && p.landScale     <= 0.9)
         #expect((1...8).contains(p.coyoteFrames))
         #expect((1...8).contains(p.bufferFrames))
-        #expect(p.fallMult       >= 1.0 && p.fallMult       <= 2.8)
-        #expect(p.apexGravFactor >= 0.1 && p.apexGravFactor <= 0.9)
+        #expect(p.fallMult        >= 1.0 && p.fallMult        <= 2.8)
+        #expect(p.apexGravFactor  >= 0.1 && p.apexGravFactor  <= 0.9)
+        #expect(p.doubleJumpScale >= 0.2 && p.doubleJumpScale <= 1.4)
     }
 
     @Test func codableRoundtrip() throws {
