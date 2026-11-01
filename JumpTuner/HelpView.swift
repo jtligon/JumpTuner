@@ -95,6 +95,12 @@ private let helpSections: [HelpSection] = [
             HelpItem(name: "Bounce count",
                      description: "How many rubber bounces occur after the main landing. Each bounce is 25% the height of the previous one, so higher counts produce progressively tinier hops.",
                      tip: "Requires Rubber bounce to be enabled."),
+            HelpItem(name: "Double jump",
+                     description: "Lets the player tap jump a second time while airborne to get an additional burst of height. The second jump launches from wherever the character is mid-air, not from the ground. While moving with the landscape joystick, the second jump is always available.",
+                     tip: "Pairs well with lower main jump height so the double jump feels like a meaningful reach extension."),
+            HelpItem(name: "2nd jump height",
+                     description: "Height of the mid-air jump as a fraction of the main jump height. 0.75 = 75% of the normal jump. Ranges from 0.25 to 1.0.",
+                     tip: "0.5–0.75 is the classic feel. Requires Double jump to be enabled."),
         ]
     ),
 ]
