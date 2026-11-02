@@ -108,7 +108,9 @@ struct ContentView: View {
         }
         .ignoresSafeArea()
         .sheet(item: $selectedQRPreset) { preset in
-            PresetQRView(preset: preset)
+            PresetQRView(preset: preset) { newPreset in
+                store.save(newPreset)
+            }
         }
         .sheet(item: $selectedCodePreset) { preset in
             CodeExportView(preset: preset)
