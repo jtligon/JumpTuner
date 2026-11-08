@@ -21,6 +21,8 @@ final class JumpScene: SKScene {
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
     private var isJumping = false
+    private var currentPhase: JumpPhase = .idle
+    private var doubleJumpAvailable = false
     private let groundY: CGFloat = 36
     private let characterSize = CGSize(width: 36, height: 48)
 
@@ -44,7 +46,13 @@ final class JumpScene: SKScene {
 
     func triggerJump() {
         if isJumping {
-            restartJump()
+            let airPhases: Set<JumpPhase> = [.ascending, .apex, .descending]
+            if params.features.doubleJump && airPhases.contains(currentPhase) && doubleJumpAvailable {
+                startAirJump()
+            } else if !params.features.doubleJump || !airPhases.contains(currentPhase) {
+                restartJump()
+            }
+            // If airborne + double jump enabled but already consumed: ignore
         } else {
             startJump()
         }
@@ -55,6 +63,8 @@ final class JumpScene: SKScene {
         characterNode.removeAllActions()
         isJumping = false
         isLooping = false
+        doubleJumpAvailable = false
+        currentPhase = .idle
         character.position = CGPoint(x: characterX, y: characterRestY)
         character.xScale = 1
         character.yScale = 1
@@ -172,10 +182,25 @@ final class JumpScene: SKScene {
 
     private func startJump() {
         isJumping = true
+        doubleJumpAvailable = params.features.doubleJump
         let config = JumpPhysicsConfig(params: params, scaledHeight: scaledHeight())
         let restY  = characterRestY
         let peakY  = restY + scaledHeight()
         runJumpSequence(config: config, restY: restY, peakY: peakY)
+    }
+
+    private func startAirJump() {
+        doubleJumpAvailable = false
+        let fromY = character.position.y
+        character.removeAllActions()
+        characterNode.removeAllActions()
+        character.xScale = 1
+        character.yScale = 1
+        character.position = CGPoint(x: characterX, y: fromY)
+        let config = JumpPhysicsConfig(params: params, scaledHeight: scaledHeight())
+        let restY  = characterRestY
+        let peakY  = fromY + scaledHeight() * CGFloat(params.doubleJumpScale)
+        runAirJumpSequence(config: config, peakY: peakY, restY: restY)
     }
 
     private func restartJump() {
@@ -189,7 +214,10 @@ final class JumpScene: SKScene {
 
     private func runJumpSequence(config: JumpPhysicsConfig, restY: CGFloat, peakY: CGFloat) {
         func setPhase(_ p: JumpPhase) -> SKAction {
-            .run { [weak self] in self?.characterNode.setPhase(p) }
+            .run { [weak self] in
+                self?.characterNode.setPhase(p)
+                self?.currentPhase = p
+            }
         }
         func scaleGroup(x: CGFloat, y: CGFloat, duration: TimeInterval) -> SKAction {
             .group([.scaleX(to: x, duration: duration), .scaleY(to: y, duration: duration)])
@@ -273,6 +301,101 @@ final class JumpScene: SKScene {
 
         steps += [
             // Idle and optionally loop
+            setPhase(.idle),
+            .run { [weak self] in
+                guard let self else { return }
+                self.isJumping = false
+                if self.isLooping {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+                        self?.startJump()
+                    }
+                }
+            }
+        ]
+
+        character.run(.sequence(steps), withKey: "jump")
+    }
+
+    private func runAirJumpSequence(config: JumpPhysicsConfig, peakY: CGFloat, restY: CGFloat) {
+        func setPhase(_ p: JumpPhase) -> SKAction {
+            .run { [weak self] in
+                self?.characterNode.setPhase(p)
+                self?.currentPhase = p
+            }
+        }
+        func scaleGroup(x: CGFloat, y: CGFloat, duration: TimeInterval) -> SKAction {
+            .group([.scaleX(to: x, duration: duration), .scaleY(to: y, duration: duration)])
+        }
+        func moveTo(y: CGFloat, duration: TimeInterval, timing: SKActionTimingMode) -> SKAction {
+            let a = SKAction.moveTo(y: y, duration: duration)
+            a.timingMode = timing
+            return a
+        }
+
+        let frameDur: TimeInterval = 2.0 / 60.0
+        let ascentDuration  = params.ascentFrames / 60.0
+        let descentDuration = params.descentFrames / 60.0
+
+        var steps: [SKAction] = [
+            // Launch stretch immediately — no squat in mid-air
+            spawnPhaseLabels(.ascending),
+            setPhase(.ascending),
+            scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+
+            // Rise to air-jump peak
+            SKAction.group([
+                moveTo(y: peakY, duration: ascentDuration, timing: .easeOut),
+                scaleGroup(x: 1, y: 1, duration: ascentDuration * 0.4)
+            ]),
+
+            // Apex float
+            spawnPhaseLabels(.apex),
+            setPhase(.apex),
+            .wait(forDuration: config.apexDuration),
+
+            // Descent back to ground
+            spawnPhaseLabels(.descending),
+            setPhase(.descending),
+            moveTo(y: restY, duration: descentDuration, timing: .easeIn),
+
+            // Land squash
+            spawnPhaseLabels(.landing),
+            setPhase(.landing),
+            .run { [weak self] in self?.fireHaptic() },
+            scaleGroup(x: config.landScaleX, y: config.landScaleY, duration: frameDur),
+
+            // Recover to neutral
+            scaleGroup(x: 1, y: 1, duration: config.landingDuration),
+        ]
+
+        if params.features.rubberBounce {
+            let fullHeight = scaledHeight()
+            let baseDeform = 1.0 - params.landScale
+
+            for i in 0..<Int(params.bounceCount) {
+                let hr = CGFloat(pow(0.25, Double(i + 1)))
+                let ds = Double(pow(0.5, Double(i + 1)))
+                let bounceY     = restY + fullHeight * hr
+                let bAscent     = max(2.0 / 60.0, ascentDuration  * ds)
+                let bDescent    = max(2.0 / 60.0, descentDuration * ds)
+                let bLandingDur = max(2.0 / 60.0, config.landingDuration * ds)
+                let bSquashY    = CGFloat(1.0 - baseDeform * Double(hr))
+                let bSquashX    = 1.0 / bSquashY
+
+                steps += [
+                    setPhase(.ascending),
+                    moveTo(y: bounceY, duration: bAscent,  timing: .easeOut),
+                    setPhase(.descending),
+                    moveTo(y: restY,   duration: bDescent, timing: .easeIn),
+                    setPhase(.landing),
+                    .run { [weak self] in self?.fireHaptic() },
+                    scaleGroup(x: bSquashX, y: bSquashY, duration: frameDur),
+                    scaleGroup(x: 1,        y: 1,        duration: bLandingDur),
+                ]
+            }
+        }
+
+        steps += [
             setPhase(.idle),
             .run { [weak self] in
                 guard let self else { return }
