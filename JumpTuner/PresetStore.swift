@@ -2,83 +2,159 @@
 //
 // Persistence layer for saved jump presets.
 //
-// Storage strategy: a single JSON file in the app's Documents directory.
-// This is the right choice for a flat list of small structs — no schema
-// migration, easy to inspect/debug, survives app updates cleanly.
+// Storage strategy: NSPersistentCloudKitContainer — Core Data backed by
+// CloudKit so presets sync automatically across all of a user's devices
+// signed into the same Apple ID.
 //
-// Core Data would be appropriate if we later needed relational queries,
-// CloudKit sync, or large datasets. For now this is deliberate overkill
-// avoidance.
+// The public API (presets, save, delete) is intentionally identical to the
+// previous JSON-file implementation so the rest of the app compiles
+// unchanged. On first launch after updating from the JSON version, any
+// existing presets are migrated automatically and the JSON file is removed.
+//
+// Setup required in Xcode (one-time, cannot be scripted):
+//   • Target → Signing & Capabilities → + iCloud → check CloudKit
+//   • Add a container named "iCloud.com.yourname.JumpTuner"
+//   • Replace the container identifier string below with that name
 
+import Combine
+import CoreData
 import Foundation
-import SwiftUI   // needed for remove(atOffsets:), which is a SwiftUI Array extension
-import Combine   // needed for @Published
+import SwiftUI
 
-/// Observable store that owns the canonical list of saved presets.
-///
-/// Inject as a `@StateObject` at the root and pass down as
-/// `@ObservedObject` to child views that need read/write access.
-///
-/// All mutations go through `save(_:)` and `delete(...)` which
-/// automatically persist to disk after each change.
+private let cloudKitContainerID = "iCloud.com.yourname.JumpTuner"
+
 final class PresetStore: ObservableObject {
 
-    /// The live list of presets. Mutating this triggers SwiftUI re-renders.
-    @Published var presets: [Preset]
+    @Published var presets: [Preset] = []
 
-    private let fileURL: URL
+    private let container: NSPersistentCloudKitContainer
 
     init() {
-        let url = FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("jump_presets.json")
-        self.fileURL = url
-        // Load from disk on init. If the file doesn't exist yet (first launch)
-        // or can't be decoded, start with an empty list.
-        if let data = try? Data(contentsOf: url),
-           let saved = try? JSONDecoder().decode([Preset].self, from: data) {
-            self.presets = saved
-        } else {
-            self.presets = []
+        container = NSPersistentCloudKitContainer(name: "JumpTuner")
+
+        if let description = container.persistentStoreDescriptions.first {
+            let options = NSPersistentCloudKitContainerOptions(containerIdentifier: cloudKitContainerID)
+            description.cloudKitContainerOptions = options
+            description.setOption(
+                true as NSNumber,
+                forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey
+            )
         }
+
+        container.loadPersistentStores { [weak self] _, error in
+            if let error {
+                print("PresetStore CoreData load error: \(error)")
+                return
+            }
+            guard let self else { return }
+            container.viewContext.automaticallyMergesChangesFromParent = true
+            container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            migrateFromJSON()
+            fetchPresets()
+        }
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRemoteChange),
+            name: .NSPersistentStoreRemoteChange,
+            object: container.persistentStoreCoordinator
+        )
     }
 
-    /// Saves a preset, overwriting any existing entry with the same name.
-    /// - Parameter preset: The preset to save or update.
+    // MARK: - Public API
+
     func save(_ preset: Preset) {
-        if let idx = presets.firstIndex(where: { $0.name == preset.name }) {
-            presets[idx] = preset  // update in place
-        } else {
-            presets.append(preset)
-        }
-        persist()
+        let ctx = container.viewContext
+        let request = PresetEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "name == %@", preset.name)
+        let entity = (try? ctx.fetch(request))?.first ?? PresetEntity(context: ctx)
+
+        entity.id         = preset.id
+        entity.name       = preset.name
+        entity.paramsJSON = (try? preset.params.encoded()) ?? ""
+        if entity.createdAt == nil { entity.createdAt = Date() }
+
+        writeContext(ctx)
     }
 
-    /// Deletes presets at the given index set. Used by SwiftUI's `.onDelete`.
     func delete(at offsets: IndexSet) {
+        let ctx = container.viewContext
+        offsets.forEach { idx in
+            deleteEntity(id: presets[idx].id, in: ctx)
+        }
         presets.remove(atOffsets: offsets)
-        persist()
+        writeContext(ctx)
     }
 
-    /// Deletes a preset by its stable UUID. Used by the trash button in rows.
     func delete(id: UUID) {
+        let ctx = container.viewContext
+        deleteEntity(id: id, in: ctx)
         if let idx = presets.firstIndex(where: { $0.id == id }) {
             presets.remove(at: idx)
-            persist()
         }
+        writeContext(ctx)
     }
 
     // MARK: - Private
 
-    /// Writes the current preset list to disk atomically.
-    /// Atomic write means a crash mid-save won't corrupt the existing file —
-    /// the OS swaps in the new file only after it's fully written.
-    private func persist() {
+    private func fetchPresets() {
+        let request = PresetEntity.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+        let entities = (try? container.viewContext.fetch(request)) ?? []
+        DispatchQueue.main.async { [weak self] in
+            self?.presets = entities.compactMap(Preset.init)
+        }
+    }
+
+    private func writeContext(_ ctx: NSManagedObjectContext) {
+        guard ctx.hasChanges else { return }
         do {
-            let data = try JSONEncoder().encode(presets)
-            try data.write(to: fileURL, options: .atomic)
+            try ctx.save()
+            fetchPresets()
         } catch {
             print("PresetStore save error: \(error)")
+        }
+    }
+
+    private func deleteEntity(id: UUID, in ctx: NSManagedObjectContext) {
+        let request = PresetEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", id as CVarArg)
+        (try? ctx.fetch(request))?.forEach { ctx.delete($0) }
+    }
+
+    // MARK: - One-time JSON migration
+
+    private func migrateFromJSON() {
+        let url = FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("jump_presets.json")
+
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let legacy = try? JSONDecoder().decode([Preset].self, from: data) else { return }
+
+        let ctx = container.viewContext
+        for preset in legacy {
+            let request = PresetEntity.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %@", preset.id as CVarArg)
+            guard (try? ctx.fetch(request))?.isEmpty != false else { continue }
+            let entity = PresetEntity(context: ctx)
+            entity.id         = preset.id
+            entity.name       = preset.name
+            entity.paramsJSON = (try? preset.params.encoded()) ?? ""
+            entity.createdAt  = Date()
+        }
+
+        if ctx.hasChanges {
+            try? ctx.save()
+        }
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    @objc private func handleRemoteChange(_ notification: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            self?.container.viewContext.refreshAllObjects()
+            self?.fetchPresets()
         }
     }
 }

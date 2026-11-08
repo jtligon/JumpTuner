@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		7C92AF6B2F9EB9E700DA02C5 /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 7C92AF5C2F9EB9E700DA02C5 /* ARCHITECTURE.md */; };
 		7C92AF6C2F9EB9E700DA02C5 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 7C92AF682F9EB9E700DA02C5 /* README.md */; };
+		E80BE90F42E024234EF967D1 /* CoreData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A75793496C22DC62E13BFE81 /* CoreData.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -26,6 +27,7 @@
 		7C69EB052FB0407F001E3427 /* JumpTunerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JumpTunerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7C92AF5C2F9EB9E700DA02C5 /* ARCHITECTURE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ARCHITECTURE.md; sourceTree = "<group>"; };
 		7C92AF682F9EB9E700DA02C5 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		A75793496C22DC62E13BFE81 /* CoreData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreData.framework; path = System/Library/Frameworks/CoreData.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -41,6 +43,8 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7C21C7DD2F9D9BF60002AF98 /* JumpTuner */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = JumpTuner;
 			sourceTree = "<group>";
 		};
@@ -59,6 +63,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E80BE90F42E024234EF967D1 /* CoreData.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -80,6 +85,7 @@
 				7C21C7DD2F9D9BF60002AF98 /* JumpTuner */,
 				7C69EB062FB0407F001E3427 /* JumpTunerTests */,
 				7C21C7DC2F9D9BF60002AF98 /* Products */,
+				B321672717BE0A1AFC3FD2DA /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -90,6 +96,14 @@
 				7C69EB052FB0407F001E3427 /* JumpTunerTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		B321672717BE0A1AFC3FD2DA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A75793496C22DC62E13BFE81 /* CoreData.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -111,8 +125,6 @@
 				7C21C7DD2F9D9BF60002AF98 /* JumpTuner */,
 			);
 			name = JumpTuner;
-			packageProductDependencies = (
-			);
 			productName = JumpTuner;
 			productReference = 7C21C7DB2F9D9BF60002AF98 /* JumpTuner.app */;
 			productType = "com.apple.product-type.application";
@@ -134,8 +146,6 @@
 				7C69EB062FB0407F001E3427 /* JumpTunerTests */,
 			);
 			name = JumpTunerTests;
-			packageProductDependencies = (
-			);
 			productName = JumpTunerTests;
 			productReference = 7C69EB052FB0407F001E3427 /* JumpTunerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
