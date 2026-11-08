@@ -66,6 +66,10 @@ struct ParamsEditorView: View {
                               color: SectionTheme.feel)
                 LabeledSlider(label: "Bounce count",         value: $params.bounceCount,
                               range: 1...6, step: 1, decimals: 0, color: SectionTheme.feel)
+                LabeledToggle(label: "Double jump",          value: $params.features.doubleJump,
+                              color: SectionTheme.feel)
+                LabeledSlider(label: "Air jump scale",       value: $params.doubleJumpScale,
+                              range: 0.1...1.5, step: 0.05, decimals: 2, color: SectionTheme.feel)
             }
 
             CollapsibleSection(title: "Floating text", icon: "text.bubble",

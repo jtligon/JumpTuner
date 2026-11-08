@@ -43,15 +43,19 @@ let jumpParams = JumpParams(
     coyoteFrames:   \(num(params.coyoteFrames)),
     bufferFrames:   \(num(params.bufferFrames)),
     fallMult:       \(num(params.fallMult)),
-    apexGravFactor: \(num(params.apexGravFactor)),
-    floatFrames:    \(num(params.floatFrames)),
+    apexGravFactor:  \(num(params.apexGravFactor)),
+    floatFrames:     \(num(params.floatFrames)),
+    bounceCount:     \(num(params.bounceCount)),
+    doubleJumpScale: \(num(params.doubleJumpScale)),
     features: JumpFeatures(
         coyoteTime:   \(f.coyoteTime),
         jumpBuffer:   \(f.jumpBuffer),
         variableJump: \(f.variableJump),
         asymGrav:     \(f.asymGrav),
         apexGrav:     \(f.apexGrav),
-        floating:     \(f.floating)
+        floating:     \(f.floating),
+        rubberBounce: \(f.rubberBounce),
+        doubleJump:   \(f.doubleJump)
     )
 )
 """
@@ -75,8 +79,10 @@ var land_scale      := \(num(params.landScale))
 var coyote_frames   := \(num(params.coyoteFrames))
 var buffer_frames   := \(num(params.bufferFrames))
 var fall_mult       := \(num(params.fallMult))
-var apex_grav_factor := \(num(params.apexGravFactor))
-var float_frames    := \(num(params.floatFrames))
+var apex_grav_factor  := \(num(params.apexGravFactor))
+var float_frames      := \(num(params.floatFrames))
+var bounce_count      := \(num(params.bounceCount))
+var double_jump_scale := \(num(params.doubleJumpScale))
 # Features
 var coyote_time   := \(f.coyoteTime)
 var jump_buffer   := \(f.jumpBuffer)
@@ -84,6 +90,8 @@ var variable_jump := \(f.variableJump)
 var asym_grav     := \(f.asymGrav)
 var apex_grav     := \(f.apexGrav)
 var floating      := \(f.floating)
+var rubber_bounce := \(f.rubberBounce)
+var double_jump   := \(f.doubleJump)
 """
     }
 
@@ -106,8 +114,10 @@ var jumpParams = new JumpParams {
     CoyoteFrames   = \(numf(params.coyoteFrames)),
     BufferFrames   = \(numf(params.bufferFrames)),
     FallMult       = \(numf(params.fallMult)),
-    ApexGravFactor = \(numf(params.apexGravFactor)),
-    FloatFrames    = \(numf(params.floatFrames)),
+    ApexGravFactor  = \(numf(params.apexGravFactor)),
+    FloatFrames     = \(numf(params.floatFrames)),
+    BounceCount     = \(numf(params.bounceCount)),
+    DoubleJumpScale = \(numf(params.doubleJumpScale)),
     // Features
     CoyoteTime   = \(f.coyoteTime),
     JumpBuffer   = \(f.jumpBuffer),
@@ -115,6 +125,8 @@ var jumpParams = new JumpParams {
     AsymGrav     = \(f.asymGrav),
     ApexGrav     = \(f.apexGrav),
     Floating     = \(f.floating),
+    RubberBounce = \(f.rubberBounce),
+    DoubleJump   = \(f.doubleJump),
 };
 """
     }
