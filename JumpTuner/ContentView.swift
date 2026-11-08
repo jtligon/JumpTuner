@@ -18,12 +18,19 @@ struct ContentView: View {
     private let drawerWidth: CGFloat = 260
 
     var body: some View {
+        // Deliberately not ignoring the safe area here, so its insets can be read.
         GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            let safeArea = geo.safeAreaInsets
+            let drawerTotalWidth = drawerWidth + safeArea.trailing
+
             ZStack(alignment: .trailing) {
 
                 // Full-screen preview — always fills the whole screen
                 JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger,
-                                showParamText: $showFloatingText, selectedSkin: $selectedSkin)
+                                showParamText: $showFloatingText, selectedSkin: $selectedSkin,
+                                isLandscape: isLandscape, safeArea: safeArea,
+                                rightObstruction: drawerOpen ? drawerTotalWidth : safeArea.trailing)
                     .ignoresSafeArea()
                     .onTapGesture {
                         if !drawerOpen { jumpTrigger += 1 }
@@ -52,7 +59,7 @@ struct ContentView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .offset(x: drawerOpen ? -(drawerWidth) : 0)
+                    .offset(x: drawerOpen ? -drawerTotalWidth : -safeArea.trailing)
                     Spacer()
                 }
                 .zIndex(10)
@@ -84,7 +91,7 @@ struct ContentView: View {
                         }
                     }
                     .padding(.horizontal, 14)
-                    .padding(.top, 56)   // below status bar
+                    .padding(.top, isLandscape ? safeArea.top + 12 : 56)   // below status bar
                     .padding(.bottom, 10)
 
                     Divider()
@@ -109,12 +116,19 @@ struct ContentView: View {
                         .padding(.bottom, 40)
                     }
                 }
-                .frame(width: drawerWidth)
+                .padding(.trailing, safeArea.trailing)
+                .frame(width: drawerTotalWidth)
                 .adaptiveGlassBackground()
-                .offset(x: drawerOpen ? 0 : drawerWidth)
+                .offset(x: drawerOpen ? 0 : drawerTotalWidth)
+            }
+            .ignoresSafeArea()
+            .onChange(of: isLandscape) {
+                // Landscape is for playing, so the sidebar gets out of the way.
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    drawerOpen = !isLandscape
+                }
             }
         }
-        .ignoresSafeArea()
         .characterPhotoFlow(isPresented: $showingPhotoPicker) { newSkin in
             customSkins.append(newSkin)
             selectedSkin = newSkin

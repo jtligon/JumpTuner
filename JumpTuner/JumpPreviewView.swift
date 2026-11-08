@@ -80,6 +80,10 @@ struct JumpPreviewView: View {
     @Binding var jumpTrigger: Int
     @Binding var showParamText: Bool
     @Binding var selectedSkin: CharacterSkin
+    var isLandscape: Bool = false
+    var safeArea: EdgeInsets = EdgeInsets()
+    /// Width covered on the right by the sidebar and the safe area.
+    var rightObstruction: CGFloat = 0
 
     @State private var looping: Bool = false
     @State private var animating: Bool = false
@@ -97,8 +101,21 @@ struct JumpPreviewView: View {
                 SpriteView(scene: scene)
                     .ignoresSafeArea()
 
+                if isLandscape {
+                    OnScreenControlsView(onMove: scene.setMoveDirection) {
+                        animating = true
+                        scene.triggerJump()
+                    }
+                    .padding(.leading, safeArea.leading + 20)
+                    .padding(.trailing, rightObstruction + 20)
+                    .padding(.bottom, safeArea.bottom + 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .transition(.opacity)
+                }
+
                 // Controls — vertical rail on the left, clear of the Dynamic
-                // Island and the home indicator
+                // Island and the home indicator. Top-aligned in landscape so
+                // it stays above the joystick.
                 VStack(spacing: 10) {
                     RailToggle(systemImage: "repeat", label: "Loop", isOn: looping) {
                         looping.toggle()
@@ -127,7 +144,9 @@ struct JumpPreviewView: View {
                         }
                     }
                 }
-                .padding(.leading, 12)
+                .padding(.leading, safeArea.leading + 12)
+                .padding(.top, isLandscape ? safeArea.top + 12 : 0)
+                .frame(maxHeight: .infinity, alignment: isLandscape ? .top : .center)
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
@@ -145,6 +164,17 @@ struct JumpPreviewView: View {
         .onChange(of: showParamText) {
             scene.showFloatingText = showParamText
         }
+        .onChange(of: isLandscape) {
+            if !isLandscape { scene.clearManualMovement() }
+        }
+        .onChange(of: floatingTextRightInset, initial: true) {
+            scene.floatingTextRightInset = floatingTextRightInset
+        }
+    }
+
+    /// In landscape, keeps floating labels clear of the sidebar and its tab.
+    private var floatingTextRightInset: CGFloat {
+        isLandscape ? rightObstruction + 34 : 0
     }
 }
 

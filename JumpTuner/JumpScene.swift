@@ -18,6 +18,8 @@ final class JumpScene: SKScene {
     var isLooping: Bool = false
     var isAutoRunning: Bool = false
     var showFloatingText: Bool = true
+    /// Keeps floating labels clear of the Dynamic Island in landscape.
+    var floatingTextRightInset: CGFloat = 0
 
     private let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
 
@@ -28,6 +30,12 @@ final class JumpScene: SKScene {
     private var lastUpdateTime: TimeInterval = 0
     private let autoRunSpeed: CGFloat = 120  // pts/sec
     private var floatingTextCeilingY: CGFloat = 0
+    private let moveSpeed: CGFloat = 180     // pts/sec
+    private let moveEdgeMargin: CGFloat = 24
+    private var moveDirection: CGFloat = 0
+    /// Where the on-screen controls left the character, if they've moved it.
+    private var manualX: CGFloat?
+    private var starFieldSize: CGSize = .zero
 
     // MARK: - Scene setup
 
@@ -48,17 +56,39 @@ final class JumpScene: SKScene {
     override func update(_ currentTime: TimeInterval) {
         guard character != nil else { return }
         characterNode.setRunning(isAutoRunning)
-        guard isAutoRunning else { return }
         defer { lastUpdateTime = currentTime }
         guard lastUpdateTime > 0 else { return }
-        let dt = CGFloat(currentTime - lastUpdateTime)
-        character.position.x += dt * autoRunSpeed
-        if character.position.x > size.width + 20 {
-            character.position.x = -20
+        // Capped so a stall (backgrounding, rotation) can't teleport the character.
+        let dt = min(CGFloat(currentTime - lastUpdateTime), 0.1)
+
+        if isAutoRunning {
+            character.position.x += dt * autoRunSpeed
+            if character.position.x > size.width + 20 {
+                character.position.x = -20
+            }
+        } else if moveDirection != 0 {
+            let x = clampedToMoveRange(character.position.x + moveDirection * moveSpeed * dt)
+            character.position.x = x
+            manualX = x
         }
     }
 
     // MARK: - Public interface
+
+    /// Moves the character while held: -1 is left, 1 is right, 0 stops.
+    func setMoveDirection(_ direction: CGFloat) {
+        moveDirection = direction
+    }
+
+    /// Stops any movement and returns the character to its usual spot.
+    func clearManualMovement() {
+        moveDirection = 0
+        manualX = nil
+        guard character != nil, !isAutoRunning else { return }
+        character.position.x = homeX
+    }
+
+    var currentCharacterX: CGFloat { character.position.x }
 
     func triggerJump() {
         if isJumping {
@@ -80,7 +110,7 @@ final class JumpScene: SKScene {
     func stopAutoRun() {
         isAutoRunning = false
         if !isJumping {
-            character.position.x = characterX
+            character.position.x = homeX
         }
     }
 
@@ -90,7 +120,7 @@ final class JumpScene: SKScene {
         isJumping = false
         hasUsedDoubleJump = false
         isLooping = false
-        character.position = CGPoint(x: characterX, y: characterRestY)
+        character.position = CGPoint(x: homeX, y: characterRestY)
         character.xScale = 1
         character.yScale = 1
         characterNode.setPhase(.idle)
@@ -109,6 +139,12 @@ final class JumpScene: SKScene {
     // MARK: - Layout helpers
 
     private var characterX: CGFloat { size.width * 0.3 }
+    private var homeX: CGFloat { manualX ?? characterX }
+
+    private func clampedToMoveRange(_ x: CGFloat) -> CGFloat {
+        min(max(x, moveEdgeMargin), max(size.width - moveEdgeMargin, moveEdgeMargin))
+    }
+
     // character origin at feet level; visual nodes have feet at y=0 in local space
     private var characterRestY: CGFloat { groundY + 2 }
 
@@ -120,19 +156,30 @@ final class JumpScene: SKScene {
 
     private func repositionNodes() {
         groundNode?.position = CGPoint(x: size.width / 2, y: groundY)
+        if groundNode != nil, size != starFieldSize {
+            children.filter { $0.name == Self.starName }.forEach { $0.removeFromParent() }
+            setupStars()
+        }
+        manualX = manualX.map(clampedToMoveRange)
         guard !isAutoRunning else { return }
         if !isJumping {
-            character?.position = CGPoint(x: characterX, y: characterRestY)
+            character?.position = CGPoint(x: homeX, y: characterRestY)
         } else {
-            character?.position.x = characterX
+            character?.position.x = homeX
         }
     }
 
     // MARK: - Setup
 
+    private static let starName = "star"
+
+    /// Stars are laid out for the current screen shape, so this runs again on rotation.
     private func setupStars() {
+        starFieldSize = size
         for _ in 0..<45 {
             let star = SKShapeNode(circleOfRadius: CGFloat.random(in: 0.5...1.5))
+            star.name = Self.starName
+            star.zPosition = -1
             star.fillColor = .white
             star.strokeColor = .clear
             star.alpha = CGFloat.random(in: 0.3...0.8)
@@ -150,7 +197,8 @@ final class JumpScene: SKScene {
     private func setupGround() {
         groundNode = SKNode()
         groundNode.position = CGPoint(x: size.width / 2, y: groundY)
-        let line = SKShapeNode(rectOf: CGSize(width: max(size.width, 375), height: 3))
+        // Wider than any screen, so it still reaches both edges after rotating.
+        let line = SKShapeNode(rectOf: CGSize(width: 4000, height: 3))
         line.fillColor = UIColor(red: 0.4, green: 0.5, blue: 0.6, alpha: 1)
         line.strokeColor = .clear
         groundNode.addChild(line)
@@ -193,7 +241,11 @@ final class JumpScene: SKScene {
         label.verticalAlignmentMode = .center
         label.alpha = 0.9
         label.position = CGPoint(
-            x: FloatingTextLayout.rightEdge(forLabelAt: spriteMidY, screenRight: size.width - 14, existing: onScreen),
+            x: FloatingTextLayout.rightEdge(
+                forLabelAt: spriteMidY,
+                screenRight: size.width - 14 - floatingTextRightInset,
+                existing: onScreen
+            ),
             y: spriteMidY
         )
         addChild(label)
@@ -238,7 +290,7 @@ final class JumpScene: SKScene {
         characterNode.removeAllActions()
         character.xScale = 1
         character.yScale = 1
-        let xPos = isAutoRunning ? character.position.x : characterX
+        let xPos = isAutoRunning ? character.position.x : homeX
         character.position = CGPoint(x: xPos, y: characterRestY)
         startJump()
     }
