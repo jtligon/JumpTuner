@@ -79,13 +79,11 @@ struct JumpPreviewView: View {
     @Binding var params: JumpParams
     @Binding var jumpTrigger: Int
     @Binding var showParamText: Bool
+    @Binding var selectedSkin: CharacterSkin
 
     @State private var looping: Bool = false
     @State private var animating: Bool = false
     @State private var autoRunning: Bool = false
-    @State private var selectedSkin: CharacterSkin = .robot
-    @State private var customSkins: [CharacterSkin] = []
-    @State private var showingPhotoPicker = false
 
     @State private var scene: JumpScene = {
         let s = JumpScene()
@@ -93,113 +91,49 @@ struct JumpPreviewView: View {
         return s
     }()
 
-    private var allSkins: [CharacterSkin] { CharacterSkin.builtIn + customSkins }
-
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: .bottom) {
+            ZStack(alignment: .leading) {
                 SpriteView(scene: scene)
                     .ignoresSafeArea()
 
-                // Controls — top bar
-                VStack(alignment: .leading, spacing: 8) {
-                    // Row 1: playback controls
-                    HStack(spacing: 10) {
-                        // Loop toggle
-                        Button {
-                            looping.toggle()
-                            scene.isLooping = looping
-                        } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(looping
-                                          ? Color.groundColor.opacity(0.3)
-                                          : Color.white.opacity(0.12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(looping
-                                                    ? Color.groundColor
-                                                    : Color.white.opacity(0.3),
-                                                    lineWidth: 1.5)
-                                    )
-                                    .frame(width: 42, height: 32)
-                                Image(systemName: "repeat")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(
-                                        looping ? Color.groundColor : .white.opacity(0.7)
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-
-                        // Auto-runner toggle
-                        Button {
-                            autoRunning.toggle()
-                            if autoRunning {
-                                animating = false
-                                scene.startAutoRun()
-                            } else {
-                                scene.stopAutoRun()
-                            }
-                        } label: {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(autoRunning
-                                          ? Color.groundColor.opacity(0.3)
-                                          : Color.white.opacity(0.12))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(autoRunning
-                                                    ? Color.groundColor
-                                                    : Color.white.opacity(0.3),
-                                                    lineWidth: 1.5)
-                                    )
-                                    .frame(width: 42, height: 32)
-                                Image(systemName: "figure.run")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(
-                                        autoRunning ? Color.groundColor : .white.opacity(0.7)
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-
-                        // Play / stop
-                        ControllerButton(isPlaying: animating || autoRunning) {
-                            if animating || autoRunning {
-                                animating = false
-                                autoRunning = false
-                                scene.stopAutoRun()
-                                scene.stopJumping()
-                            } else {
-                                animating = true
-                                scene.triggerJump()
-                            }
-                        }
-
-                        Spacer()
+                // Controls — vertical rail on the left, clear of the Dynamic
+                // Island and the home indicator
+                VStack(spacing: 10) {
+                    RailToggle(systemImage: "repeat", label: "Loop", isOn: looping) {
+                        looping.toggle()
+                        scene.isLooping = looping
                     }
 
-                    // Row 2: character picker — wraps horizontally
-                    ChipFlowView(allSkins: allSkins, selectedSkin: selectedSkin) { skin in
-                        selectedSkin = skin
-                        scene.setCharacter(skin)
-                    } onAdd: {
-                        showingPhotoPicker = true
+                    RailToggle(systemImage: "figure.run", label: "Auto-run", isOn: autoRunning) {
+                        autoRunning.toggle()
+                        if autoRunning {
+                            animating = false
+                            scene.startAutoRun()
+                        } else {
+                            scene.stopAutoRun()
+                        }
+                    }
+
+                    ControllerButton(isPlaying: animating || autoRunning) {
+                        if animating || autoRunning {
+                            animating = false
+                            autoRunning = false
+                            scene.stopAutoRun()
+                            scene.stopJumping()
+                        } else {
+                            animating = true
+                            scene.triggerJump()
+                        }
                     }
                 }
-                .padding(.leading, 16)
-                .padding(.trailing, 16)
-                .padding(.top, 56)
-                Spacer()
+                .padding(.leading, 12)
             }
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .ignoresSafeArea()
-        .characterPhotoFlow(isPresented: $showingPhotoPicker) { newSkin in
-            customSkins.append(newSkin)
-            selectedSkin = newSkin
-            scene.setCharacter(newSkin)
+        .onChange(of: selectedSkin.id) {
+            scene.setCharacter(selectedSkin)
         }
         .onChange(of: params) {
             scene.params = params
@@ -214,119 +148,38 @@ struct JumpPreviewView: View {
     }
 }
 
-// MARK: - Chip flow layout
+// MARK: - Rail buttons
 
-private struct ChipFlowView: View {
-    let allSkins: [CharacterSkin]
-    let selectedSkin: CharacterSkin
-    let onSelect: (CharacterSkin) -> Void
-    let onAdd: () -> Void
-
-    var body: some View {
-        WrapLayout(hSpacing: 6, vSpacing: 6) {
-            ForEach(allSkins) { skin in
-                SkinChip(skin: skin, isSelected: skin.id == selectedSkin.id) {
-                    onSelect(skin)
-                }
-            }
-            Button(action: onAdd) {
-                Image(systemName: "camera.fill")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.75))
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.white.opacity(0.12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                            )
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-    }
-}
-
-/// Wrapping flow layout using the Layout protocol (iOS 16+).
-private struct WrapLayout: Layout {
-    var hSpacing: CGFloat = 6
-    var vSpacing: CGFloat = 6
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var height: CGFloat = 0
-        for (i, row) in rows.enumerated() {
-            let rowH = row.map { subviews[$0].sizeThatFits(.unspecified).height }.max() ?? 0
-            height += rowH
-            if i < rows.count - 1 { height += vSpacing }
-        }
-        return CGSize(width: proposal.width ?? 0, height: height)
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let rows = computeRows(proposal: proposal, subviews: subviews)
-        var y = bounds.minY
-        for row in rows {
-            var x = bounds.minX
-            let rowH = row.map { subviews[$0].sizeThatFits(.unspecified).height }.max() ?? 0
-            for idx in row {
-                let size = subviews[idx].sizeThatFits(.unspecified)
-                subviews[idx].place(at: CGPoint(x: x, y: y), proposal: .unspecified)
-                x += size.width + hSpacing
-            }
-            y += rowH + vSpacing
-        }
-    }
-
-    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[Int]] {
-        let maxW = proposal.width ?? .infinity
-        var rows: [[Int]] = [[]]
-        var rowWidth: CGFloat = 0
-        for (i, subview) in subviews.enumerated() {
-            let w = subview.sizeThatFits(.unspecified).width
-            if !rows[rows.count - 1].isEmpty, rowWidth + w > maxW {
-                rows.append([i])
-                rowWidth = w + hSpacing
-            } else {
-                rows[rows.count - 1].append(i)
-                rowWidth += w + hSpacing
-            }
-        }
-        return rows
-    }
-}
-
-// MARK: - Skin chip
-
-private struct SkinChip: View {
-    let skin: CharacterSkin
-    let isSelected: Bool
+/// On/off control, highlighted in the ground colour while on.
+private struct RailToggle: View {
+    let systemImage: String
+    let label: String
+    let isOn: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(skin.name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(isSelected ? .black : .white.opacity(0.75))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(isSelected ? Color.white.opacity(0.90) : Color.white.opacity(0.12))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(isSelected ? Color.white : Color.white.opacity(0.25),
-                                        lineWidth: 1)
-                        )
-                )
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(isOn ? Color.groundColor.opacity(0.3) : Color.white.opacity(0.12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(isOn ? Color.groundColor : Color.white.opacity(0.3), lineWidth: 1.5)
+                    )
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(isOn ? Color.groundColor : .white.opacity(0.7))
+            }
+            .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
 #Preview {
-    JumpPreviewView(params: .constant(.defaults), jumpTrigger: .constant(0), showParamText: .constant(true))
+    JumpPreviewView(params: .constant(.defaults), jumpTrigger: .constant(0), showParamText: .constant(true),
+                    selectedSkin: .constant(.robot))
         .ignoresSafeArea()
 }

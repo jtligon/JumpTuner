@@ -43,9 +43,12 @@ extension Color {
 
 // MARK: - Section accent colors
 
-/// Accent colors for the five collapsible parameter sections.
+/// Accent colors for the collapsible sidebar sections.
 /// Each section gets a distinct hue so the drawer is scannable at a glance.
 enum SectionTheme {
+    /// Characters section — warm orange.
+    static let characters = Color(red: 1.00, green: 0.62, blue: 0.25)
+
     /// Timing section — cool blue.
     static let timing  = Color(red: 0.38, green: 0.70, blue: 1.00)
 

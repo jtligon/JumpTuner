@@ -21,6 +21,11 @@ final class PirateNode: SKNode, CharacterNode {
     private var leftEye:       SKShapeNode!
     private var rightEye:      SKShapeNode! // has patch
 
+    /// Front-facing figure used for standing and jumping.
+    private let standRig = SKNode()
+    /// Side-on figure shown only while running.
+    private let runRig = RunRig(legSegment: 10.5, standHipY: 19, leanDegrees: 7)
+
     override init() {
         super.init()
         build()
@@ -34,6 +39,7 @@ final class PirateNode: SKNode, CharacterNode {
     // MARK: - Build
 
     private func build() {
+        addChild(standRig)
         addBoots()
         addLegs()
         addBelt()
@@ -41,6 +47,7 @@ final class PirateNode: SKNode, CharacterNode {
         addArms()
         addHead()
         addHat()
+        buildRunRig()
     }
 
     private func addBoots() {
@@ -49,7 +56,7 @@ final class PirateNode: SKNode, CharacterNode {
             let boot = roundedRect(CGRect(x: -5, y: 0, width: 10, height: 8),
                                    corner: 2, fill: Self.boot)
             boot.position = CGPoint(x: x, y: 0)
-            addChild(boot)
+            standRig.addChild(boot)
         }
     }
 
@@ -58,20 +65,20 @@ final class PirateNode: SKNode, CharacterNode {
         let pants = roundedRect(CGRect(x: -9, y: 0, width: 18, height: 11),
                                 corner: 2, fill: Self.coat)
         pants.position = CGPoint(x: 0, y: 8)
-        addChild(pants)
+        standRig.addChild(pants)
     }
 
     private func addBelt() {
         let b = roundedRect(CGRect(x: -10, y: -2, width: 20, height: 4),
                             corner: 1, fill: Self.belt)
         b.position = CGPoint(x: 0, y: 19)
-        addChild(b)
+        standRig.addChild(b)
 
         // Buckle
         let buckle = roundedRect(CGRect(x: -3, y: -2, width: 6, height: 4),
                                  corner: 1, fill: Self.buckle)
         buckle.position = CGPoint(x: 0, y: 19)
-        addChild(buckle)
+        standRig.addChild(buckle)
     }
 
     private func addBody() {
@@ -80,13 +87,13 @@ final class PirateNode: SKNode, CharacterNode {
                                corner: 4, fill: Self.coat,
                                stroke: Self.coatTrim, lineWidth: 1.5)
         body.position = CGPoint(x: 0, y: 28)
-        addChild(body)
+        standRig.addChild(body)
 
         // Shirt/chest opening
         let chest = roundedRect(CGRect(x: -4, y: -7, width: 8, height: 14),
                                 corner: 2, fill: Self.shirt)
         chest.position = CGPoint(x: 0, y: 28)
-        addChild(chest)
+        standRig.addChild(chest)
 
         // Coat lapels — small triangular flaps using path
         for side: CGFloat in [-1, 1] {
@@ -100,7 +107,7 @@ final class PirateNode: SKNode, CharacterNode {
             lapel.fillColor = Self.coat
             lapel.strokeColor = Self.coatTrim
             lapel.lineWidth = 1
-            addChild(lapel)
+            standRig.addChild(lapel)
         }
     }
 
@@ -110,8 +117,8 @@ final class PirateNode: SKNode, CharacterNode {
         rightArmPivot = makeArm(isRight: true)
         leftArmPivot.position  = CGPoint(x: -11, y: 35)
         rightArmPivot.position = CGPoint(x:  11, y: 35)
-        addChild(leftArmPivot)
-        addChild(rightArmPivot)
+        standRig.addChild(leftArmPivot)
+        standRig.addChild(rightArmPivot)
     }
 
     private func makeArm(isRight: Bool) -> SKNode {
@@ -157,26 +164,26 @@ final class PirateNode: SKNode, CharacterNode {
         let face = roundedRect(CGRect(x: -9, y: -8, width: 18, height: 16),
                                corner: 6, fill: Self.skin)
         face.position = CGPoint(x: 0, y: 43)
-        addChild(face)
+        standRig.addChild(face)
 
         // Beard / stubble — dark rounded rect on chin
         let beard = roundedRect(CGRect(x: -7, y: -10, width: 14, height: 5),
                                 corner: 3, fill: UIColor(red: 0.25, green: 0.15, blue: 0.10, alpha: 0.85))
         beard.position = CGPoint(x: 0, y: 43)
-        addChild(beard)
+        standRig.addChild(beard)
 
         // Left eye (good eye)
         leftEye = SKShapeNode(circleOfRadius: 2.5)
         leftEye.fillColor   = UIColor(red: 0.15, green: 0.20, blue: 0.35, alpha: 1)
         leftEye.strokeColor = .clear
         leftEye.position    = CGPoint(x: -4, y: 44)
-        addChild(leftEye)
+        standRig.addChild(leftEye)
 
         // Right eye + patch
         let patch = roundedRect(CGRect(x: -4.5, y: -3, width: 9, height: 6),
                                 corner: 2, fill: UIColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1))
         patch.position = CGPoint(x: 4, y: 44)
-        addChild(patch)
+        standRig.addChild(patch)
 
         // Patch strap
         let strap = SKShapeNode()
@@ -186,13 +193,13 @@ final class PirateNode: SKNode, CharacterNode {
         strap.path = strPath
         strap.strokeColor = UIColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 0.8)
         strap.lineWidth = 1.5
-        addChild(strap)
+        standRig.addChild(strap)
 
         // Right eye hidden by patch
         rightEye = SKShapeNode(circleOfRadius: 2)
         rightEye.fillColor = .clear
         rightEye.position  = CGPoint(x: 4, y: 44)
-        addChild(rightEye)
+        standRig.addChild(rightEye)
 
         // Nose
         let nose = roundedRect(CGRect(x: -2, y: -1.5, width: 4, height: 3), corner: 1.5,
@@ -201,30 +208,35 @@ final class PirateNode: SKNode, CharacterNode {
         noseDot.fillColor = UIColor(red: 0.80, green: 0.60, blue: 0.45, alpha: 1)
         noseDot.strokeColor = .clear
         noseDot.position = CGPoint(x: 0, y: 40)
-        addChild(noseDot)
+        standRig.addChild(noseDot)
         _ = nose
     }
 
     private func addHat() {
-        hatNode = SKNode()
+        hatNode = makeHat()
         hatNode.position = CGPoint(x: 0, y: 51)
+        standRig.addChild(hatNode)
+    }
+
+    private func makeHat() -> SKNode {
+        let hat = SKNode()
 
         // Brim
         let brim = roundedRect(CGRect(x: -12, y: -2, width: 24, height: 4),
                                corner: 1, fill: Self.hat)
-        hatNode.addChild(brim)
+        hat.addChild(brim)
 
         // Crown
         let crown = roundedRect(CGRect(x: -8, y: 2, width: 16, height: 14),
                                 corner: 3, fill: Self.hat)
-        hatNode.addChild(crown)
+        hat.addChild(crown)
 
         // Skull — white circle + crossbones dots
         let skull = SKShapeNode(circleOfRadius: 3.5)
         skull.fillColor = .white
         skull.strokeColor = .clear
         skull.position = CGPoint(x: 0, y: 9)
-        hatNode.addChild(skull)
+        hat.addChild(skull)
 
         // Eye dots on skull
         for dx: CGFloat in [-1.3, 1.3] {
@@ -232,20 +244,22 @@ final class PirateNode: SKNode, CharacterNode {
             dot.fillColor = Self.hat
             dot.strokeColor = .clear
             dot.position = CGPoint(x: dx, y: 9.5)
-            hatNode.addChild(dot)
+            hat.addChild(dot)
         }
 
         // Hat band
         let band = roundedRect(CGRect(x: -8, y: 2, width: 16, height: 3),
                                corner: 0, fill: Self.coatTrim)
-        hatNode.addChild(band)
+        hat.addChild(band)
 
-        addChild(hatNode)
+        return hat
     }
 
     // MARK: - Phase animation
 
     func setPhase(_ phase: JumpPhase, duration: TimeInterval = 0.08) {
+        runRig.setJumpPhase(phase)
+
         let leftArmAngle:  CGFloat
         let rightArmAngle: CGFloat
         let hatAngle:      CGFloat
@@ -288,6 +302,156 @@ final class PirateNode: SKNode, CharacterNode {
         rightArmPivot.run(.rotate(toAngle: rightArmAngle, duration: duration, shortestUnitArc: true))
         hatNode.run(.rotate(toAngle: hatAngle, duration: duration, shortestUnitArc: true))
         leftEye.run(.scale(to: eyeScale, duration: duration))
+    }
+
+    // MARK: - Run cycle
+
+    func setRunning(_ running: Bool) {
+        runRig.setRunning(running, hiding: standRig)
+    }
+
+    private func buildRunRig() {
+        let farCoat = UIColor(red: 0.16, green: 0.10, blue: 0.27, alpha: 1)
+        addChild(runRig)
+
+        runRig.addLegs(far: makeRunLeg(fill: farCoat), near: makeRunLeg(fill: Self.coat),
+                       farX: 3, nearX: -2)
+        let content = runRig.content
+
+        runRig.addFarArm(makeRunArm(fill: farCoat), at: CGPoint(x: 3, y: 35))
+
+        let belt = roundedRect(CGRect(x: -9, y: -2, width: 18, height: 4),
+                               corner: 1, fill: Self.belt)
+        belt.position = CGPoint(x: 0, y: 19)
+        content.addChild(belt)
+
+        let body = roundedRect(CGRect(x: -8, y: -9, width: 16, height: 18),
+                               corner: 4, fill: Self.coat,
+                               stroke: Self.coatTrim, lineWidth: 1.5)
+        body.position = CGPoint(x: 0, y: 28)
+        content.addChild(body)
+
+        let chest = roundedRect(CGRect(x: -3, y: -7, width: 6, height: 14),
+                                corner: 2, fill: Self.shirt)
+        chest.position = CGPoint(x: 3.5, y: 28)
+        content.addChild(chest)
+
+        let buckle = roundedRect(CGRect(x: -2.5, y: -2, width: 5, height: 4),
+                                 corner: 1, fill: Self.buckle)
+        buckle.position = CGPoint(x: 4, y: 19)
+        content.addChild(buckle)
+
+        addRunFace(to: content)
+
+        let hat = makeHat()
+        hat.position = CGPoint(x: 2, y: 51)
+        content.addChild(hat)
+
+        runRig.addNearArm(makeRunSwordArm(), at: CGPoint(x: 0, y: 35))
+
+        // The hat lifts off the head on each landing and tips with the stride.
+        let hatLift: [CGFloat] = [0, 2, 1, 0]
+        runRig.onFrame = { frame in
+            hat.position.y = 51 + hatLift[frame % hatLift.count]
+            hat.zRotation  = 0.12 + sin(CGFloat(frame) * .pi / 4) * 0.08
+        }
+
+        // The hat tips back on the rise and floats off the head on the way down.
+        runRig.onJumpPhase = { phase in
+            let lift: CGFloat
+            let tilt: CGFloat
+            switch phase {
+            case .squat:      (lift, tilt) = (0, 0.05)
+            case .ascending:  (lift, tilt) = (0, 0.3)
+            case .apex:       (lift, tilt) = (1, 0.15)
+            case .descending: (lift, tilt) = (5, -0.1)
+            case .landing:    (lift, tilt) = (0, 0.2)
+            case .idle:       (lift, tilt) = (0, 0.12)
+            }
+            hat.run(.group([
+                .moveTo(y: 51 + lift, duration: 0.1),
+                .rotate(toAngle: tilt, duration: 0.1, shortestUnitArc: true)
+            ]))
+        }
+    }
+
+    private func addRunFace(to content: SKNode) {
+        let face = roundedRect(CGRect(x: -8.5, y: -8, width: 17, height: 16),
+                               corner: 6, fill: Self.skin)
+        face.position = CGPoint(x: 2, y: 43)
+        content.addChild(face)
+
+        let beard = roundedRect(CGRect(x: -6, y: -10, width: 13, height: 5),
+                                corner: 3, fill: UIColor(red: 0.25, green: 0.15, blue: 0.10, alpha: 0.85))
+        beard.position = CGPoint(x: 4, y: 43)
+        content.addChild(beard)
+
+        let eye = SKShapeNode(circleOfRadius: 2.5)
+        eye.fillColor   = UIColor(red: 0.15, green: 0.20, blue: 0.35, alpha: 1)
+        eye.strokeColor = .clear
+        eye.position    = CGPoint(x: 1.5, y: 44)
+        content.addChild(eye)
+
+        let patch = roundedRect(CGRect(x: -4, y: -3, width: 8, height: 6),
+                                corner: 2, fill: UIColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1))
+        patch.position = CGPoint(x: 7, y: 44)
+        content.addChild(patch)
+
+        let strap = SKShapeNode()
+        let strapPath = CGMutablePath()
+        strapPath.move(to: CGPoint(x: -6, y: 47))
+        strapPath.addLine(to: CGPoint(x: 7, y: 47))
+        strap.path = strapPath
+        strap.strokeColor = UIColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 0.8)
+        strap.lineWidth = 1.5
+        content.addChild(strap)
+
+        let nose = SKShapeNode(circleOfRadius: 1.5)
+        nose.fillColor   = UIColor(red: 0.80, green: 0.60, blue: 0.45, alpha: 1)
+        nose.strokeColor = .clear
+        nose.position    = CGPoint(x: 9.5, y: 40)
+        content.addChild(nose)
+    }
+
+    private func makeRunLeg(fill: UIColor) -> RunLimb {
+        let length: CGFloat = 10.5
+        let limb = RunLimb(length: length, width: 7, fill: fill,
+                           stroke: Self.coatTrim.withAlphaComponent(0.5), lineWidth: 0.75)
+        limb.lower.addChild(roundedRect(CGRect(x: -3.5, y: -length, width: 11, height: 6),
+                                        corner: 2, fill: Self.boot))
+        return limb
+    }
+
+    private let runArmLength: CGFloat = 7
+
+    private func makeRunArm(fill: UIColor) -> RunLimb {
+        let limb = RunLimb(length: runArmLength, width: 5.5, fill: fill, stroke: Self.coatTrim)
+        limb.lower.addChild(roundedRect(CGRect(x: -3, y: -runArmLength - 1, width: 6, height: 3),
+                                        corner: 1.5, fill: Self.shirt))
+        return limb
+    }
+
+    /// The near arm, with the cutlass held in line with the forearm.
+    private func makeRunSwordArm() -> RunLimb {
+        let limb = makeRunArm(fill: Self.coat)
+        let hand = -runArmLength - 1
+
+        let blade = SKShapeNode()
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: -1.2, y: hand))
+        path.addLine(to: CGPoint(x: -0.5, y: hand - 15))
+        path.addLine(to: CGPoint(x: 2, y: hand - 13))
+        path.addLine(to: CGPoint(x: 1.5, y: hand))
+        path.closeSubpath()
+        blade.path = path
+        blade.fillColor   = UIColor(red: 0.75, green: 0.78, blue: 0.82, alpha: 1)
+        blade.strokeColor = UIColor(white: 0.9, alpha: 0.6)
+        blade.lineWidth   = 0.5
+        limb.lower.addChild(blade)
+
+        limb.lower.addChild(roundedRect(CGRect(x: -4, y: hand - 2, width: 8, height: 2.5),
+                                        corner: 1.25, fill: Self.buckle))
+        return limb
     }
 
     // MARK: - Shape helpers
