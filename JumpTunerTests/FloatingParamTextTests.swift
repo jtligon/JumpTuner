@@ -2,6 +2,7 @@
 // Tests for FloatingParamEvent and JumpPhase.paramEvents(for:)
 
 import Testing
+import CoreGraphics
 import Foundation
 @testable import JumpTuner
 
@@ -102,5 +103,55 @@ struct JumpPhaseParamEventsTests {
         #expect(JumpPhase.apex.paramEvents(for: params)[0].value == "4f")
         #expect(JumpPhase.descending.paramEvents(for: params)[0].value == "12f")
         #expect(JumpPhase.landing.paramEvents(for: params)[0].value == "5f")
+    }
+}
+
+@Suite("FloatingTextLayout")
+@MainActor
+struct FloatingTextLayoutTests {
+
+    @Test func emptyLineUsesTheScreenEdge() {
+        #expect(FloatingTextLayout.rightEdge(forLabelAt: 60, screenRight: 388, existing: []) == 388)
+    }
+
+    @Test func labelOnTheSameLineMovesToTheLeft() {
+        let existing = [CGRect(x: 320, y: 54, width: 68, height: 12)]
+        let edge = FloatingTextLayout.rightEdge(forLabelAt: 60, screenRight: 388, existing: existing)
+        #expect(edge == 320 - FloatingTextLayout.columnGap)
+    }
+
+    @Test func thirdLabelClearsEveryLabelOnTheLine() {
+        let existing = [CGRect(x: 320, y: 54, width: 68, height: 12),
+                        CGRect(x: 240, y: 54, width: 68, height: 12)]
+        let edge = FloatingTextLayout.rightEdge(forLabelAt: 60, screenRight: 388, existing: existing)
+        #expect(edge == 240 - FloatingTextLayout.columnGap)
+    }
+
+    @Test func labelsOnOtherLinesAreIgnored() {
+        let existing = [CGRect(x: 320, y: 200, width: 68, height: 12)]
+        #expect(FloatingTextLayout.rightEdge(forLabelAt: 60, screenRight: 388, existing: existing) == 388)
+    }
+
+    @Test func ceilingIsLevelWithTheSpriteAtItsPeak() {
+        #expect(FloatingTextLayout.ceiling(peakY: 300, spriteHeight: 48, screenHeight: 874) == 324)
+    }
+
+    @Test func labelsFromBelowStopAtTheTopOfTheJump() {
+        #expect(FloatingTextLayout.riseTarget(fromY: 62, ceiling: 324, screenHeight: 874) == 324)
+    }
+
+    @Test func labelsStartingAtThePeakKeepDrifting() {
+        #expect(FloatingTextLayout.riseTarget(fromY: 324, ceiling: 324, screenHeight: 874)
+                == 324 + FloatingTextLayout.peakDrift)
+    }
+
+    @Test func driftStaysOnScreen() {
+        #expect(FloatingTextLayout.riseTarget(fromY: 804, ceiling: 804, screenHeight: 874)
+                == 874 - FloatingTextLayout.driftTopMargin)
+    }
+
+    @Test func ceilingStaysOnScreen() {
+        #expect(FloatingTextLayout.ceiling(peakY: 900, spriteHeight: 48, screenHeight: 874)
+                == 874 - FloatingTextLayout.topMargin)
     }
 }

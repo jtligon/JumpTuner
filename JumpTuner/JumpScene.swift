@@ -27,6 +27,7 @@ final class JumpScene: SKScene {
     private let characterSize = CGSize(width: 36, height: 48)
     private var lastUpdateTime: TimeInterval = 0
     private let autoRunSpeed: CGFloat = 120  // pts/sec
+    private var floatingTextCeilingY: CGFloat = 0
 
     // MARK: - Scene setup
 
@@ -175,19 +176,32 @@ final class JumpScene: SKScene {
 
     // MARK: - Floating param text
 
-    private var floatingTextYBase: CGFloat { groundY + 80 }
+    private static let floatingLabelName = "floatingParamLabel"
 
-    private func spawnFloatingLabel(_ text: String, yOffset: CGFloat = 0) {
+    /// Starts a label level with the sprite and scrolls it up to the top of the
+    /// jump. Labels that start at the top keep drifting up past it.
+    private func spawnFloatingLabel(_ text: String) {
+        let spriteMidY = character.position.y + characterSize.height / 2
+        let onScreen = children.filter { $0.name == Self.floatingLabelName }.map(\.frame)
+
         let label = SKLabelNode(text: text)
+        label.name = Self.floatingLabelName
         label.fontSize = 11
         label.fontColor = SKColor(red: 0.85, green: 1.0, blue: 0.85, alpha: 1)
         label.fontName = "Menlo-Bold"
         label.horizontalAlignmentMode = .right
+        label.verticalAlignmentMode = .center
         label.alpha = 0.9
-        label.position = CGPoint(x: size.width - 14, y: floatingTextYBase + yOffset)
+        label.position = CGPoint(
+            x: FloatingTextLayout.rightEdge(forLabelAt: spriteMidY, screenRight: size.width - 14, existing: onScreen),
+            y: spriteMidY
+        )
         addChild(label)
 
-        let rise   = SKAction.moveBy(x: 0, y: 110, duration: 1.6)
+        let target = FloatingTextLayout.riseTarget(
+            fromY: spriteMidY, ceiling: floatingTextCeilingY, screenHeight: size.height
+        )
+        let rise   = SKAction.moveTo(y: target, duration: 1.6)
         rise.timingMode = .easeOut
         let fade   = SKAction.fadeOut(withDuration: 1.6)
         label.run(.sequence([.group([rise, fade]), .removeFromParent()]))
@@ -196,11 +210,17 @@ final class JumpScene: SKScene {
     private func spawnPhaseLabels(_ phase: JumpPhase) -> SKAction {
         .run { [weak self] in
             guard let self, showFloatingText else { return }
-            let events = phase.paramEvents(for: params)
-            for (i, event) in events.enumerated() {
-                spawnFloatingLabel(event.formatted, yOffset: CGFloat(i) * 22)
+            for event in phase.paramEvents(for: params) {
+                spawnFloatingLabel(event.formatted)
             }
         }
+    }
+
+    /// Sets where this jump's labels stop: level with the sprite at its peak.
+    private func updateFloatingTextCeiling(peakY: CGFloat) {
+        floatingTextCeilingY = FloatingTextLayout.ceiling(
+            peakY: peakY, spriteHeight: characterSize.height, screenHeight: size.height
+        )
     }
 
     // MARK: - Jump
@@ -240,6 +260,8 @@ final class JumpScene: SKScene {
     }
 
     private func runJumpSequence(config: JumpPhysicsConfig, restY: CGFloat, peakY: CGFloat) {
+        updateFloatingTextCeiling(peakY: peakY)
+
         func setPhase(_ p: JumpPhase) -> SKAction {
             .run { [weak self] in self?.characterNode.setPhase(p) }
         }
@@ -341,6 +363,8 @@ final class JumpScene: SKScene {
     }
 
     private func runDoubleJumpSequence(config: JumpPhysicsConfig, startY: CGFloat, restY: CGFloat, peakY: CGFloat) {
+        updateFloatingTextCeiling(peakY: peakY)
+
         func setPhase(_ p: JumpPhase) -> SKAction {
             .run { [weak self] in self?.characterNode.setPhase(p) }
         }
