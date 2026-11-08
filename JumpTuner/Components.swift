@@ -206,18 +206,18 @@ struct ControllerButton: View {
     var body: some View {
         Button(action: onTap) {
             ZStack {
-                RoundedRectangle(cornerRadius: 16)
+                RoundedRectangle(cornerRadius: 14)
                     .fill(Color.white.opacity(0.18))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 16)
+                        RoundedRectangle(cornerRadius: 14)
                             .stroke(Color.white.opacity(0.45), lineWidth: 1.5)
                     )
-                    .frame(width: 58, height: 32)
-                RoundedRectangle(cornerRadius: 12)
+                    .frame(width: 44, height: 44)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(Color.black.opacity(0.3))
-                    .frame(width: 48, height: 22)
+                    .frame(width: 34, height: 34)
                 Image(systemName: isPlaying ? "stop.fill" : "play.fill")
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 16, weight: .bold))
                     .foregroundColor(
                         isPlaying ? Color(red: 1, green: 0.4, blue: 0.4) : .white
                     )

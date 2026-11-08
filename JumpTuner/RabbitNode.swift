@@ -16,6 +16,11 @@ final class RabbitNode: SKNode, CharacterNode {
     private var leftEye:       SKShapeNode!
     private var rightEye:      SKShapeNode!
 
+    /// Front-facing figure used for standing and jumping.
+    private let standRig = SKNode()
+    /// Side-on figure shown only while running.
+    private let runRig = RunRig(legSegment: 6.5, standHipY: 8, leanDegrees: 12)
+
     override init() {
         super.init()
         build()
@@ -29,11 +34,13 @@ final class RabbitNode: SKNode, CharacterNode {
     // MARK: - Build
 
     private func build() {
+        addChild(standRig)
         addFeet()
         addBody()
         addArms()
         addHead()
         addEars()
+        buildRunRig()
     }
 
     private func addFeet() {
@@ -42,7 +49,7 @@ final class RabbitNode: SKNode, CharacterNode {
             let foot = ellipse(width: 14, height: 7, fill: Self.bodyColor,
                                stroke: Self.accentColor, lineWidth: 1)
             foot.position = CGPoint(x: x + flip * 1, y: 3.5)
-            addChild(foot)
+            standRig.addChild(foot)
         }
     }
 
@@ -52,17 +59,17 @@ final class RabbitNode: SKNode, CharacterNode {
                                 corner: 7, fill: Self.bodyColor,
                                 stroke: Self.accentColor, lineWidth: 1)
         torso.position = CGPoint(x: 0, y: 17)
-        addChild(torso)
+        standRig.addChild(torso)
 
         // Fluffy tail — small circle peeking out the back
         let tail = circle(radius: 5, fill: Self.bodyColor)
         tail.position = CGPoint(x: -12, y: 16)
-        addChild(tail)
+        standRig.addChild(tail)
 
         // Belly highlight
         let belly = ellipse(width: 10, height: 14, fill: Self.innerEar.withAlphaComponent(0.4))
         belly.position = CGPoint(x: 0, y: 17)
-        addChild(belly)
+        standRig.addChild(belly)
     }
 
     private func addArms() {
@@ -71,7 +78,7 @@ final class RabbitNode: SKNode, CharacterNode {
                                   corner: 3, fill: Self.bodyColor,
                                   stroke: Self.accentColor, lineWidth: 1)
             arm.position = CGPoint(x: x, y: 15)
-            addChild(arm)
+            standRig.addChild(arm)
         }
     }
 
@@ -81,28 +88,28 @@ final class RabbitNode: SKNode, CharacterNode {
         head.strokeColor = Self.accentColor
         head.lineWidth = 1
         head.position = CGPoint(x: 0, y: 33)
-        addChild(head)
+        standRig.addChild(head)
 
         // Eyes
         leftEye  = circle(radius: 2.5, fill: Self.eyeColor)
         rightEye = circle(radius: 2.5, fill: Self.eyeColor)
         leftEye.position  = CGPoint(x: -4, y: 34)
         rightEye.position = CGPoint(x:  4, y: 34)
-        addChild(leftEye)
-        addChild(rightEye)
+        standRig.addChild(leftEye)
+        standRig.addChild(rightEye)
 
         // Eye shine
         for (base, dx): (SKShapeNode, CGFloat) in [(leftEye, -4), (rightEye, 4)] {
             let shine = circle(radius: 0.9, fill: .white)
             shine.position = CGPoint(x: dx + 1, y: 35)
-            addChild(shine)
+            standRig.addChild(shine)
             _ = base // suppress warning
         }
 
         // Nose
         let nose = circle(radius: 2, fill: Self.accentColor)
         nose.position = CGPoint(x: 0, y: 30)
-        addChild(nose)
+        standRig.addChild(nose)
 
         // Mouth — two tiny lines forming a Y shape
         let mouth = SKShapeNode()
@@ -114,7 +121,7 @@ final class RabbitNode: SKNode, CharacterNode {
         mouth.path = path
         mouth.strokeColor = Self.accentColor.withAlphaComponent(0.6)
         mouth.lineWidth = 1
-        addChild(mouth)
+        standRig.addChild(mouth)
     }
 
     private func addEars() {
@@ -123,8 +130,8 @@ final class RabbitNode: SKNode, CharacterNode {
         rightEarPivot = makeEar(facingLeft: false)
         leftEarPivot.position  = CGPoint(x: -4, y: 43)
         rightEarPivot.position = CGPoint(x:  4, y: 43)
-        addChild(leftEarPivot)
-        addChild(rightEarPivot)
+        standRig.addChild(leftEarPivot)
+        standRig.addChild(rightEarPivot)
     }
 
     private func makeEar(facingLeft: Bool) -> SKNode {
@@ -147,6 +154,8 @@ final class RabbitNode: SKNode, CharacterNode {
     // MARK: - Phase animation
 
     func setPhase(_ phase: JumpPhase, duration: TimeInterval = 0.08) {
+        runRig.setJumpPhase(phase)
+
         // Ears: positive SK angle = CCW. Left ear positive = leans left (outward).
         // Both ears lean the same direction to simulate wind/gravity effects.
         let leftAngle:  CGFloat
@@ -186,6 +195,100 @@ final class RabbitNode: SKNode, CharacterNode {
         let eyeAnim = SKAction.scaleY(to: eyeScaleY, duration: duration)
         leftEye.run(eyeAnim)
         rightEye.run(eyeAnim)
+    }
+
+    // MARK: - Run cycle
+
+    func setRunning(_ running: Bool) {
+        runRig.setRunning(running, hiding: standRig)
+    }
+
+    private func buildRunRig() {
+        let farFill = UIColor(red: 0.76, green: 0.72, blue: 0.70, alpha: 1)
+        addChild(runRig)
+
+        runRig.addLegs(far: makeRunLeg(fill: farFill), near: makeRunLeg(fill: Self.bodyColor),
+                       farX: 3, nearX: -1)
+        let content = runRig.content
+
+        let tail = circle(radius: 5, fill: Self.bodyColor)
+        tail.position = CGPoint(x: -10, y: 13)
+        content.addChild(tail)
+
+        runRig.addFarArm(makeRunArm(fill: farFill), at: CGPoint(x: 4, y: 22))
+
+        let torso = roundedRect(CGRect(x: -8, y: -10, width: 16, height: 20),
+                                corner: 7, fill: Self.bodyColor,
+                                stroke: Self.accentColor, lineWidth: 1)
+        torso.position = CGPoint(x: 0, y: 17)
+        content.addChild(torso)
+
+        let belly = ellipse(width: 7, height: 14, fill: Self.innerEar.withAlphaComponent(0.4))
+        belly.position = CGPoint(x: 4, y: 17)
+        content.addChild(belly)
+
+        // Ears go under the head and stream out behind it.
+        let farEar  = makeEar(facingLeft: true)
+        let nearEar = makeEar(facingLeft: true)
+        farEar.position  = CGPoint(x: 3, y: 41)
+        nearEar.position = CGPoint(x: 0, y: 41)
+        content.addChild(farEar)
+        content.addChild(nearEar)
+
+        let head = circle(radius: 10.5, fill: Self.bodyColor)
+        head.strokeColor = Self.accentColor
+        head.lineWidth = 1
+        head.position = CGPoint(x: 3, y: 33)
+        content.addChild(head)
+
+        for (x, radius): (CGFloat, CGFloat) in [(4, 2.5), (9.5, 2.2)] {
+            let eye = circle(radius: radius, fill: Self.eyeColor)
+            eye.position = CGPoint(x: x, y: 35)
+            content.addChild(eye)
+            let shine = circle(radius: 0.9, fill: .white)
+            shine.position = CGPoint(x: x + 1, y: 36)
+            content.addChild(shine)
+        }
+
+        let nose = circle(radius: 1.8, fill: Self.accentColor)
+        nose.position = CGPoint(x: 11.5, y: 30)
+        content.addChild(nose)
+
+        runRig.addNearArm(makeRunArm(fill: Self.bodyColor), at: CGPoint(x: 0, y: 22))
+
+        runRig.onFrame = { frame in
+            let flop = sin(CGFloat(frame) * .pi / 2) * 0.22
+            nearEar.zRotation = 1.15 + flop
+            farEar.zRotation  = 1.0 - flop
+        }
+
+        // Ears trail the jump: flat on the way up, lifted by the air on the way down.
+        runRig.onJumpPhase = { phase in
+            let angle: CGFloat
+            switch phase {
+            case .squat:      angle = 1.3
+            case .ascending:  angle = 1.45
+            case .apex:       angle = 0.7
+            case .descending: angle = 0.1
+            case .landing:    angle = 1.5
+            case .idle:       angle = 1.1
+            }
+            let rotate = SKAction.rotate(toAngle: angle, duration: 0.1, shortestUnitArc: true)
+            nearEar.run(rotate)
+            farEar.run(rotate)
+        }
+    }
+
+    private func makeRunLeg(fill: UIColor) -> RunLimb {
+        let length: CGFloat = 6.5
+        let limb = RunLimb(length: length, width: 5, fill: fill, stroke: Self.accentColor)
+        limb.lower.addChild(roundedRect(CGRect(x: -3, y: -length, width: 11, height: 4),
+                                        corner: 2, fill: fill, stroke: Self.accentColor, lineWidth: 1))
+        return limb
+    }
+
+    private func makeRunArm(fill: UIColor) -> RunLimb {
+        RunLimb(length: 5, width: 5, fill: fill, stroke: Self.accentColor)
     }
 
     // MARK: - Shape helpers

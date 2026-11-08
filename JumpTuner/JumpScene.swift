@@ -45,7 +45,9 @@ final class JumpScene: SKScene {
     }
 
     override func update(_ currentTime: TimeInterval) {
-        guard isAutoRunning, character != nil else { return }
+        guard character != nil else { return }
+        characterNode.setRunning(isAutoRunning)
+        guard isAutoRunning else { return }
         defer { lastUpdateTime = currentTime }
         guard lastUpdateTime > 0 else { return }
         let dt = CGFloat(currentTime - lastUpdateTime)

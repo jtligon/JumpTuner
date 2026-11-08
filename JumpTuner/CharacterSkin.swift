@@ -6,10 +6,14 @@ import SpriteKit
 /// An SKNode subclass that knows how to animate itself per jump phase.
 protocol CharacterNode: SKNode {
     func setPhase(_ phase: JumpPhase, duration: TimeInterval)
+    /// Starts or stops the character's run animation. Must be safe to call every frame.
+    func setRunning(_ running: Bool)
 }
 
 extension CharacterNode {
     func setPhase(_ phase: JumpPhase) { setPhase(phase, duration: 0.08) }
+    /// Characters without a run animation keep their standing pose.
+    func setRunning(_ running: Bool) {}
 }
 
 /// Describes one swappable character skin.
@@ -17,6 +21,13 @@ struct CharacterSkin: Identifiable {
     let id: String
     let name: String
     let make: () -> any CharacterNode
+
+    /// Renders the character's standing pose for use as a picker icon.
+    func makeThumbnail() -> UIImage? {
+        let view = SKView(frame: CGRect(x: 0, y: 0, width: 64, height: 64))
+        guard let texture = view.texture(from: make()) else { return nil }
+        return UIImage(cgImage: texture.cgImage())
+    }
 
     static let builtIn: [CharacterSkin] = [.robot, .rabbit, .pirate]
 

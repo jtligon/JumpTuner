@@ -16,6 +16,12 @@ final class RobotNode: SKNode, CharacterNode {
     private var leftEye:       SKShapeNode!
     private var rightEye:      SKShapeNode!
 
+    /// Front-facing figure used for standing and jumping.
+    private let standRig = SKNode()
+
+    /// Side-on figure with jointed limbs, shown only while running.
+    private let runRig = RunRig(legSegment: 7, standHipY: 10, leanDegrees: 9)
+
     // MARK: - Init
 
     override init() {
@@ -33,10 +39,12 @@ final class RobotNode: SKNode, CharacterNode {
     private func build() {
         // All positions use SpriteKit coords (y+ up), with feet at y=0.
         // Conversion from SwiftUI RobotView offsets: SK_y = 24 − swiftui_y
+        addChild(standRig)
         addLegs()
         addBody()
         addArms()
         addHead()
+        buildRunRig()
     }
 
     private func addLegs() {
@@ -44,7 +52,7 @@ final class RobotNode: SKNode, CharacterNode {
             let leg = roundedRect(CGRect(x: -2.5, y: 0, width: 5, height: 10),
                                   corner: 2.5, fill: Self.bodyColor, stroke: Self.accentColor, lineWidth: 1.5)
             leg.position = CGPoint(x: x, y: 0)
-            addChild(leg)
+            standRig.addChild(leg)
         }
     }
 
@@ -53,13 +61,13 @@ final class RobotNode: SKNode, CharacterNode {
         let torso = roundedRect(CGRect(x: -10, y: -8, width: 20, height: 16),
                                 corner: 5, fill: Self.bodyColor, stroke: Self.accentColor, lineWidth: 2)
         torso.position = CGPoint(x: 0, y: 17)
-        addChild(torso)
+        standRig.addChild(torso)
 
         // Chest detail
         let chest = roundedRect(CGRect(x: -4, y: -2.5, width: 8, height: 5),
                                 corner: 2, fill: Self.accentColor.withAlphaComponent(0.6))
         chest.position = CGPoint(x: 0, y: 17)
-        addChild(chest)
+        standRig.addChild(chest)
     }
 
     private func addArms() {
@@ -69,8 +77,8 @@ final class RobotNode: SKNode, CharacterNode {
         rightArmPivot = makeArmPivot()
         leftArmPivot.position  = CGPoint(x: -14, y: 21)
         rightArmPivot.position = CGPoint(x:  14, y: 21)
-        addChild(leftArmPivot)
-        addChild(rightArmPivot)
+        standRig.addChild(leftArmPivot)
+        standRig.addChild(rightArmPivot)
     }
 
     private func makeArmPivot() -> SKNode {
@@ -87,30 +95,32 @@ final class RobotNode: SKNode, CharacterNode {
         let head = roundedRect(CGRect(x: -9, y: -7.5, width: 18, height: 15),
                                corner: 6, fill: Self.bodyColor, stroke: Self.accentColor, lineWidth: 2)
         head.position = CGPoint(x: 0, y: 30)
-        addChild(head)
+        standRig.addChild(head)
 
         // Eyes
         leftEye  = dot(radius: 2, fill: Self.accentColor)
         rightEye = dot(radius: 2, fill: Self.accentColor)
         leftEye.position  = CGPoint(x: -4.5, y: 30)
         rightEye.position = CGPoint(x:  4.5, y: 30)
-        addChild(leftEye)
-        addChild(rightEye)
+        standRig.addChild(leftEye)
+        standRig.addChild(rightEye)
 
         // Antenna stick + dot
         let stick = roundedRect(CGRect(x: -1, y: 0, width: 2, height: 5),
                                 corner: 1, fill: Self.accentColor)
         stick.position = CGPoint(x: 0, y: 37)
-        addChild(stick)
+        standRig.addChild(stick)
 
         let antennaDot = dot(radius: 2, fill: Self.accentColor)
         antennaDot.position = CGPoint(x: 0, y: 43)
-        addChild(antennaDot)
+        standRig.addChild(antennaDot)
     }
 
     // MARK: - Phase animation
 
     func setPhase(_ phase: JumpPhase, duration: TimeInterval = 0.08) {
+        runRig.setJumpPhase(phase)
+
         // Arm angles: positive = CCW in SpriteKit (y-up). Match RobotView behaviour:
         //   launch/ascent → arms reach up (left arm swings right/up, right arm left/up)
         //   descent/land  → arms trail back
@@ -141,6 +151,67 @@ final class RobotNode: SKNode, CharacterNode {
         let eyeAnim = SKAction.scale(to: eyeScale, duration: duration)
         leftEye.run(eyeAnim)
         rightEye.run(eyeAnim)
+    }
+
+    // MARK: - Run cycle
+
+    func setRunning(_ running: Bool) {
+        runRig.setRunning(running, hiding: standRig)
+    }
+
+    private func buildRunRig() {
+        let farFill = UIColor(red: 0.72, green: 0.60, blue: 0.16, alpha: 1)
+        addChild(runRig)
+
+        runRig.addLegs(far: makeRunLeg(fill: farFill), near: makeRunLeg(fill: Self.bodyColor),
+                       farX: 2, nearX: -1)
+        let content = runRig.content
+
+        runRig.addFarArm(makeRunArm(fill: farFill), at: CGPoint(x: 3, y: 22))
+
+        let torso = roundedRect(CGRect(x: -8, y: -8, width: 16, height: 16),
+                                corner: 5, fill: Self.bodyColor, stroke: Self.accentColor, lineWidth: 2)
+        torso.position = CGPoint(x: 0, y: 17)
+        content.addChild(torso)
+
+        let chest = roundedRect(CGRect(x: -3, y: -2.5, width: 6, height: 5),
+                                corner: 2, fill: Self.accentColor.withAlphaComponent(0.6))
+        chest.position = CGPoint(x: 3, y: 17)
+        content.addChild(chest)
+
+        let head = roundedRect(CGRect(x: -8.5, y: -7.5, width: 17, height: 15),
+                               corner: 6, fill: Self.bodyColor, stroke: Self.accentColor, lineWidth: 2)
+        head.position = CGPoint(x: 1.5, y: 30)
+        content.addChild(head)
+
+        for x: CGFloat in [3, 8] {
+            let eye = dot(radius: 2, fill: Self.accentColor)
+            eye.position = CGPoint(x: x, y: 30)
+            content.addChild(eye)
+        }
+
+        let stick = roundedRect(CGRect(x: -1, y: 0, width: 2, height: 5),
+                                corner: 1, fill: Self.accentColor)
+        stick.position = CGPoint(x: 1.5, y: 37)
+        content.addChild(stick)
+
+        let antennaDot = dot(radius: 2, fill: Self.accentColor)
+        antennaDot.position = CGPoint(x: 1.5, y: 43)
+        content.addChild(antennaDot)
+
+        runRig.addNearArm(makeRunArm(fill: Self.bodyColor), at: CGPoint(x: 0, y: 21))
+    }
+
+    private func makeRunLeg(fill: UIColor) -> RunLimb {
+        let length: CGFloat = 7
+        let limb = RunLimb(length: length, width: 4.5, fill: fill, stroke: Self.accentColor)
+        limb.lower.addChild(roundedRect(CGRect(x: -2.5, y: -length, width: 7.5, height: 3),
+                                        corner: 1.5, fill: fill, stroke: Self.accentColor, lineWidth: 1))
+        return limb
+    }
+
+    private func makeRunArm(fill: UIColor) -> RunLimb {
+        RunLimb(length: 6, width: 4, fill: fill, stroke: Self.accentColor)
     }
 
     // MARK: - Shape helpers

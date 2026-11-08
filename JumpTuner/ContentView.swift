@@ -11,6 +11,9 @@ struct ContentView: View {
     @State private var showHelp           = false
     @State private var jumpTrigger        = 0
     @State private var showFloatingText   = true
+    @State private var selectedSkin: CharacterSkin = .robot
+    @State private var customSkins: [CharacterSkin] = []
+    @State private var showingPhotoPicker = false
 
     private let drawerWidth: CGFloat = 260
 
@@ -19,7 +22,8 @@ struct ContentView: View {
             ZStack(alignment: .trailing) {
 
                 // Full-screen preview — always fills the whole screen
-                JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger, showParamText: $showFloatingText)
+                JumpPreviewView(params: $params, jumpTrigger: $jumpTrigger,
+                                showParamText: $showFloatingText, selectedSkin: $selectedSkin)
                     .ignoresSafeArea()
                     .onTapGesture {
                         if !drawerOpen { jumpTrigger += 1 }
@@ -87,6 +91,10 @@ struct ContentView: View {
 
                     ScrollView {
                         VStack(spacing: 8) {
+                            CharacterPickerView(skins: CharacterSkin.builtIn + customSkins,
+                                                selectedSkin: $selectedSkin) {
+                                showingPhotoPicker = true
+                            }
                             ParamsEditorView(params: $params, showFloatingText: $showFloatingText)
                             PresetsView(
                                 store: store,
@@ -107,6 +115,10 @@ struct ContentView: View {
             }
         }
         .ignoresSafeArea()
+        .characterPhotoFlow(isPresented: $showingPhotoPicker) { newSkin in
+            customSkins.append(newSkin)
+            selectedSkin = newSkin
+        }
         .sheet(item: $selectedQRPreset) { preset in
             PresetQRView(preset: preset)
         }
