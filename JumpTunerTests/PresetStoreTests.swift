@@ -1,5 +1,5 @@
 // PresetStoreTests.swift
-// Tests for PresetStore: save, delete, and disk persistence.
+// Tests for PresetStore: save, delete, persistence, and legacy JSON migration.
 
 import Testing
 import Foundation
@@ -9,49 +9,50 @@ import Foundation
 @MainActor
 struct PresetStoreTests {
 
-    private let fileURL: URL = FileManager.default
-        .urls(for: .documentDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("jump_presets.json")
+    /// Each test instance gets its own scratch directory, so tests never
+    /// share a SQLite store or a legacy JSON file.
+    private let dir: URL
+    private var storeURL: URL { dir.appendingPathComponent("Presets.sqlite") }
+    private var jsonURL: URL { dir.appendingPathComponent("jump_presets.json") }
 
-    private func deleteFile() {
-        try? FileManager.default.removeItem(at: fileURL)
+    init() throws {
+        dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PresetStoreTests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    /// Local-only store (no CloudKit) at this test's scratch location.
+    private func makeStore() -> PresetStore {
+        PresetStore(storeURL: storeURL, cloudKitContainerID: nil, legacyJSONURL: jsonURL)
     }
 
     // MARK: - init
 
     @Test func freshStoreStartsEmpty() {
-        deleteFile()
-        defer { deleteFile() }
-        let store = PresetStore()
+        let store = makeStore()
         #expect(store.presets.isEmpty)
     }
 
     @Test func initLoadsFromDisk() {
-        deleteFile()
-        defer { deleteFile() }
-        let store1 = PresetStore()
+        let store1 = makeStore()
         store1.save(Preset(name: "Persisted", params: .defaults))
 
-        let store2 = PresetStore()
+        let store2 = makeStore()
         #expect(store2.presets.count == 1)
-        #expect(store2.presets[0].name == "Persisted")
+        #expect(store2.presets.first?.name == "Persisted")
     }
 
     // MARK: - save
 
     @Test func saveAppendsNewPreset() {
-        deleteFile()
-        defer { deleteFile() }
-        let store = PresetStore()
+        let store = makeStore()
         store.save(Preset(name: "Alpha", params: .defaults))
         #expect(store.presets.count == 1)
-        #expect(store.presets[0].name == "Alpha")
+        #expect(store.presets.first?.name == "Alpha")
     }
 
     @Test func saveOverwritesExistingName() {
-        deleteFile()
-        defer { deleteFile() }
-        let store = PresetStore()
+        let store = makeStore()
         store.save(Preset(name: "Alpha", params: .defaults))
 
         var modified = JumpParams.defaults
@@ -59,28 +60,24 @@ struct PresetStoreTests {
         store.save(Preset(name: "Alpha", params: modified))
 
         #expect(store.presets.count == 1)
-        #expect(store.presets[0].params.jumpHeight == 200)
+        #expect(store.presets.first?.params.jumpHeight == 200)
     }
 
     // MARK: - delete(at:)
 
     @Test func deleteAtIndexSet() {
-        deleteFile()
-        defer { deleteFile() }
-        let store = PresetStore()
+        let store = makeStore()
         store.save(Preset(name: "A", params: .defaults))
         store.save(Preset(name: "B", params: .defaults))
         store.delete(at: IndexSet(integer: 0))
         #expect(store.presets.count == 1)
-        #expect(store.presets[0].name == "B")
+        #expect(store.presets.first?.name == "B")
     }
 
     // MARK: - delete(id:)
 
     @Test func deleteByIDFound() {
-        deleteFile()
-        defer { deleteFile() }
-        let store = PresetStore()
+        let store = makeStore()
         let preset = Preset(name: "C", params: .defaults)
         store.save(preset)
         store.delete(id: preset.id)
@@ -88,11 +85,21 @@ struct PresetStoreTests {
     }
 
     @Test func deleteByIDNotFoundIsNoop() {
-        deleteFile()
-        defer { deleteFile() }
-        let store = PresetStore()
+        let store = makeStore()
         store.save(Preset(name: "D", params: .defaults))
         store.delete(id: UUID())
         #expect(store.presets.count == 1)
+    }
+
+    // MARK: - JSON migration
+
+    @Test func migratesLegacyJSONAndRemovesFile() throws {
+        let legacy = [Preset(name: "Old", params: .defaults)]
+        try JSONEncoder().encode(legacy).write(to: jsonURL)
+
+        let store = makeStore()
+        #expect(store.presets.map(\.name) == ["Old"])
+        #expect(store.presets.first?.id == legacy[0].id)
+        #expect(!FileManager.default.fileExists(atPath: jsonURL.path))
     }
 }
