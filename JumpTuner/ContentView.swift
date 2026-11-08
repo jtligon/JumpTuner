@@ -3,7 +3,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var store        = PresetStore()
+    @EnvironmentObject private var store  : PresetStore
     @State private var params             = JumpParams()
     @State private var selectedQRPreset:   Preset?
     @State private var selectedCodePreset: Preset?
@@ -116,10 +116,18 @@ struct ContentView: View {
         .sheet(isPresented: $showHelp) {
             HelpView()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .watchActivatedPreset)
+        ) { note in
+            if let preset = note.object as? Preset {
+                params = preset.params
+            }
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environmentObject(PresetStore())
         .ignoresSafeArea()
 }
