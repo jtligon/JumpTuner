@@ -55,7 +55,7 @@ final class JumpScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         guard character != nil else { return }
-        characterNode.setRunning(isAutoRunning)
+        characterNode.setRunning(isAutoRunning || moveDirection != 0)
         defer { lastUpdateTime = currentTime }
         guard lastUpdateTime > 0 else { return }
         // Capped so a stall (backgrounding, rotation) can't teleport the character.
@@ -70,6 +70,7 @@ final class JumpScene: SKScene {
             let x = clampedToMoveRange(character.position.x + moveDirection * moveSpeed * dt)
             character.position.x = x
             manualX = x
+            characterNode.xScale = moveDirection < 0 ? -1 : 1
         }
     }
 
@@ -84,6 +85,7 @@ final class JumpScene: SKScene {
     func clearManualMovement() {
         moveDirection = 0
         manualX = nil
+        characterNode?.xScale = 1
         guard character != nil, !isAutoRunning else { return }
         character.position.x = homeX
     }
@@ -92,7 +94,8 @@ final class JumpScene: SKScene {
 
     func triggerJump() {
         if isJumping {
-            if params.features.doubleJump && !hasUsedDoubleJump {
+            let canDoubleJump = (params.features.doubleJump || moveDirection != 0) && !hasUsedDoubleJump
+            if canDoubleJump {
                 performDoubleJump()
             } else {
                 restartJump()
