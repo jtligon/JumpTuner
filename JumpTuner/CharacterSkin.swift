@@ -48,4 +48,18 @@ struct CharacterSkin: Identifiable {
             SkeletalCharacterNode(image: image)
         }
     }
+
+    /// On-device Stable Diffusion sprites — one generated texture per JumpPhase.
+    /// Falls back to `fallbackImage` tilt behaviour while generation is in progress.
+    static func diffusion(phaseTextures: [JumpPhase: SKTexture],
+                          fallbackImage: UIImage,
+                          name: String) -> CharacterSkin {
+        CharacterSkin(id: "diff-\(UUID().uuidString)", name: name) {
+            let node = DiffusionCharacterNode(fallbackImage: fallbackImage)
+            if !phaseTextures.isEmpty {
+                node.applyTextures(phaseTextures)
+            }
+            return node
+        }
+    }
 }
