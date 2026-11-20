@@ -1,0 +1,73 @@
+name: main → TestFlight
+
+# After a PR merges, build main with the real bundle ID and upload to TestFlight.
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: main-beta
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    name: Upload main to TestFlight
+    runs-on: macos-latest
+
+    steps:
+      - name: Check secrets configured
+        id: secrets
+        env:
+          CONFIGURED: ${{ secrets.DIST_CERTIFICATE_BASE64 != '' && secrets.ASC_KEY_ID != '' }}
+        run: |
+          echo "configured=$CONFIGURED" >> "$GITHUB_OUTPUT"
+          if [ "$CONFIGURED" != "true" ]; then
+            echo "::notice::TestFlight secrets not configured — skipping."
+          fi
+
+      - name: Checkout
+        if: steps.secrets.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        if: steps.secrets.outputs.configured == 'true'
+        run: sudo xcode-select -s $(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+
+      - name: Set up Ruby
+        if: steps.secrets.outputs.configured == 'true'
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+
+      - name: Import distribution certificate
+        if: steps.secrets.outputs.configured == 'true'
+        env:
+          DIST_CERTIFICATE_BASE64: ${{ secrets.DIST_CERTIFICATE_BASE64 }}
+          DIST_CERTIFICATE_PASSWORD: ${{ secrets.DIST_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
+          echo "$DIST_CERTIFICATE_BASE64" | base64 --decode > /tmp/dist_cert.p12
+          security import /tmp/dist_cert.p12 -k build.keychain \
+            -P "$DIST_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+            -k "$KEYCHAIN_PASSWORD" build.keychain
+          rm /tmp/dist_cert.p12
+
+      - name: Build and upload to TestFlight
+        if: steps.secrets.outputs.configured == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+          FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: '120'
+        run: bundle exec fastlane main_beta
