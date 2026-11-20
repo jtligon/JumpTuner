@@ -203,6 +203,10 @@ final class RabbitNode: SKNode, CharacterNode {
         runRig.setRunning(running, hiding: standRig)
     }
 
+    func setRunGroundSpeed(_ speed: CGFloat) {
+        runRig.setGroundSpeed(speed)
+    }
+
     private func buildRunRig() {
         let farFill = UIColor(red: 0.76, green: 0.72, blue: 0.70, alpha: 1)
         addChild(runRig)

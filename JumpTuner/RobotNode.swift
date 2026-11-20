@@ -159,6 +159,10 @@ final class RobotNode: SKNode, CharacterNode {
         runRig.setRunning(running, hiding: standRig)
     }
 
+    func setRunGroundSpeed(_ speed: CGFloat) {
+        runRig.setGroundSpeed(speed)
+    }
+
     private func buildRunRig() {
         let farFill = UIColor(red: 0.72, green: 0.60, blue: 0.16, alpha: 1)
         addChild(runRig)

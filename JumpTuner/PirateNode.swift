@@ -310,6 +310,10 @@ final class PirateNode: SKNode, CharacterNode {
         runRig.setRunning(running, hiding: standRig)
     }
 
+    func setRunGroundSpeed(_ speed: CGFloat) {
+        runRig.setGroundSpeed(speed)
+    }
+
     private func buildRunRig() {
         let farCoat = UIColor(red: 0.16, green: 0.10, blue: 0.27, alpha: 1)
         addChild(runRig)

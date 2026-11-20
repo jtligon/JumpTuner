@@ -8,12 +8,16 @@ protocol CharacterNode: SKNode {
     func setPhase(_ phase: JumpPhase, duration: TimeInterval)
     /// Starts or stops the character's run animation. Must be safe to call every frame.
     func setRunning(_ running: Bool)
+    /// Paces the run animation to the character's speed in points per second.
+    /// Must be safe to call every frame.
+    func setRunGroundSpeed(_ speed: CGFloat)
 }
 
 extension CharacterNode {
     func setPhase(_ phase: JumpPhase) { setPhase(phase, duration: 0.08) }
     /// Characters without a run animation keep their standing pose.
     func setRunning(_ running: Bool) {}
+    func setRunGroundSpeed(_ speed: CGFloat) {}
 }
 
 /// Describes one swappable character skin.
