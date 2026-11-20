@@ -79,3 +79,58 @@ struct RunCycleTests {
         }
     }
 }
+
+@Suite("RunCycle pacing")
+@MainActor
+struct RunCyclePacingTests {
+
+    private let robotLeg: CGFloat = 7
+
+    @Test func autoRunSpeedPlaysAtNormalPace() {
+        #expect(RunCycle.playbackRate(groundSpeed: 120, legSegment: robotLeg) == 1)
+    }
+
+    @Test func paceIsProportionalToSpeed() {
+        #expect(RunCycle.playbackRate(groundSpeed: 180, legSegment: robotLeg) == 1.5)
+        #expect(RunCycle.playbackRate(groundSpeed: 90, legSegment: robotLeg) == 0.75)
+    }
+
+    @Test func movingLeftPacesTheSameAsMovingRight() {
+        #expect(RunCycle.playbackRate(groundSpeed: -90, legSegment: robotLeg)
+                == RunCycle.playbackRate(groundSpeed: 90, legSegment: robotLeg))
+    }
+
+    @Test func longerLegsTakeSlowerStrides() {
+        let rabbit = RunCycle.playbackRate(groundSpeed: 120, legSegment: 6.5)
+        let robot  = RunCycle.playbackRate(groundSpeed: 120, legSegment: 7)
+        let pirate = RunCycle.playbackRate(groundSpeed: 120, legSegment: 10.5)
+        #expect(pirate < robot && robot < rabbit)
+    }
+
+    @Test func lightestPushStillMovesTheLegs() {
+        #expect(RunCycle.playbackRate(groundSpeed: 1, legSegment: robotLeg) == RunCycle.minimumPlaybackRate)
+    }
+
+    private func makeRig() -> RunRig {
+        let rig = RunRig(legSegment: robotLeg, standHipY: 10, leanDegrees: 9)
+        func limb() -> RunLimb { RunLimb(length: 6, width: 4, fill: .white, stroke: .white) }
+        rig.addLegs(far: limb(), near: limb(), farX: 0, nearX: 0)
+        rig.addFarArm(limb(), at: .zero)
+        rig.addNearArm(limb(), at: .zero)
+        return rig
+    }
+
+    @Test func speedChangesApplyToARunningCycle() {
+        let rig = makeRig()
+        rig.setRunning(true, hiding: SKNode())
+        rig.setGroundSpeed(180)
+        #expect(rig.action(forKey: "runCycle")?.speed == 1.5)
+    }
+
+    @Test func speedSetBeforeRunningIsUsedWhenTheCycleStarts() {
+        let rig = makeRig()
+        rig.setGroundSpeed(60)
+        rig.setRunning(true, hiding: SKNode())
+        #expect(rig.action(forKey: "runCycle")?.speed == 0.5)
+    }
+}

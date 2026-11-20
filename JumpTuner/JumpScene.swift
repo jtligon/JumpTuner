@@ -55,7 +55,11 @@ final class JumpScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         guard character != nil else { return }
-        characterNode.setRunning(isAutoRunning || moveDirection != 0)
+        // The stride keeps pace with the ground: a light joystick push walks,
+        // a full push sprints.
+        let groundSpeed = isAutoRunning ? autoRunSpeed : abs(moveDirection) * moveSpeed
+        characterNode.setRunGroundSpeed(groundSpeed)
+        characterNode.setRunning(groundSpeed > 0)
         defer { lastUpdateTime = currentTime }
         guard lastUpdateTime > 0 else { return }
         // Capped so a stall (backgrounding, rotation) can't teleport the character.
