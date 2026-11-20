@@ -28,7 +28,7 @@ jobs:
       - name: Check secrets configured
         id: secrets
         env:
-          CONFIGURED: ${{ secrets.DIST_CERTIFICATE_BASE64 != '' && secrets.ASC_KEY_ID != '' && secrets.ZEALOT_TOKEN != '' && secrets.TS_OAUTH_CLIENT_ID != '' }}
+          CONFIGURED: ${{ secrets.DIST_CERTIFICATE_BASE64 != '' && secrets.ASC_KEY_ID != '' && secrets.ZEALOT_TOKEN != '' && secrets.TS_AUTHKEY != '' }}
         run: |
           echo "configured=$CONFIGURED" >> "$GITHUB_OUTPUT"
           if [ "$CONFIGURED" != "true" ]; then
@@ -70,14 +70,13 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" build.keychain
           rm /tmp/dist_cert.p12
 
-      # Zealot is only reachable on the tailnet. Joins as an ephemeral node tagged tag:ci.
+      # Zealot is only reachable on the tailnet. TS_AUTHKEY is a reusable, ephemeral,
+      # pre-approved auth key tagged tag:ci (expires after at most 90 days, so rotate it).
       - name: Join tailnet
         if: steps.secrets.outputs.configured == 'true'
         uses: tailscale/github-action@v3
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          authkey: ${{ secrets.TS_AUTHKEY }}
 
       - name: Build ad hoc IPA and upload to Zealot
         if: steps.secrets.outputs.configured == 'true'
