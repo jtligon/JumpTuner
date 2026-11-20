@@ -14,7 +14,20 @@ final class JumpScene: SKScene {
 
     // MARK: - State
 
-    var params: JumpParams = .defaults { didSet { if isJumping { restartJump() } } }
+    var params: JumpParams = .defaults {
+        didSet {
+            if showPlatforms { updatePlatformNodes() }
+            if isJumping { restartJump() }
+        }
+    }
+    var showPlatforms: Bool = false {
+        didSet {
+            updatePlatformNodes()
+            if isJumping { restartJump() }
+        }
+    }
+
+    private var platformNodes: [SKNode] = []
     var isLooping: Bool = false
     var isAutoRunning: Bool = false
     var showFloatingText: Bool = true
@@ -164,12 +177,36 @@ final class JumpScene: SKScene {
             setupStars()
         }
         manualX = manualX.map(clampedToMoveRange)
+        if showPlatforms { updatePlatformNodes() }
         guard !isAutoRunning else { return }
         if !isJumping {
             character?.position = CGPoint(x: homeX, y: characterRestY)
         } else {
             character?.position.x = homeX
         }
+    }
+
+    // MARK: - Platforms
+
+    /// Platforms sit at 38% and 75% of the jump height, under wherever the
+    /// character currently jumps from.
+    private func updatePlatformNodes() {
+        platformNodes.forEach { $0.removeFromParent() }
+        platformNodes = []
+        guard showPlatforms, size.width > 0, character != nil else { return }
+        let h = scaledHeight()
+        let x = isAutoRunning ? characterX : homeX
+        addPlatformNode(x: x, y: characterRestY + h * 0.38, width: 96)
+        addPlatformNode(x: x, y: characterRestY + h * 0.75, width: 96)
+    }
+
+    private func addPlatformNode(x: CGFloat, y: CGFloat, width: CGFloat) {
+        let node = SKShapeNode(rectOf: CGSize(width: width, height: 4))
+        node.fillColor = UIColor(red: 0.35, green: 0.75, blue: 0.50, alpha: 0.90)
+        node.strokeColor = .clear
+        node.position = CGPoint(x: x, y: y)
+        addChild(node)
+        platformNodes.append(node)
     }
 
     // MARK: - Setup
@@ -315,6 +352,10 @@ final class JumpScene: SKScene {
     }
 
     private func runJumpSequence(config: JumpPhysicsConfig, restY: CGFloat, peakY: CGFloat) {
+        if showPlatforms {
+            runPlatformSequence(config: config, restY: restY)
+            return
+        }
         updateFloatingTextCeiling(peakY: peakY)
 
         func setPhase(_ p: JumpPhase) -> SKAction {
@@ -406,6 +447,84 @@ final class JumpScene: SKScene {
             .run { [weak self] in
                 guard let self else { return }
                 self.isJumping = false
+                if self.isLooping {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+                        self?.startJump()
+                    }
+                }
+            }
+        ]
+
+        character.run(.sequence(steps), withKey: "jump")
+    }
+
+    // Platform sequence: Ground → P1 (38% height) → P2 (75% height) → Ground
+    // Duration of each leg scales with sqrt(height ratio) to match natural physics.
+    private func runPlatformSequence(config: JumpPhysicsConfig, restY: CGFloat) {
+        func setPhase(_ p: JumpPhase) -> SKAction {
+            .run { [weak self] in self?.characterNode.setPhase(p) }
+        }
+        func scaleGroup(x: CGFloat, y: CGFloat, duration: TimeInterval) -> SKAction {
+            .group([.scaleX(to: x, duration: duration), .scaleY(to: y, duration: duration)])
+        }
+        func moveTo(y: CGFloat, duration: TimeInterval, timing: SKActionTimingMode) -> SKAction {
+            let a = SKAction.moveTo(y: y, duration: duration)
+            a.timingMode = timing
+            return a
+        }
+
+        updatePlatformNodes()
+
+        let frameDur: TimeInterval = 2.0 / 60.0
+        let ascentDuration  = params.ascentFrames / 60.0
+        let descentDuration = params.descentFrames / 60.0
+        let fullH = scaledHeight()
+
+        let p1Y = restY + fullH * 0.38
+        let p2Y = restY + fullH * 0.75
+        // The highest point of this sequence is standing on platform 2.
+        updateFloatingTextCeiling(peakY: p2Y)
+
+        let asc1  = max(frameDur, ascentDuration  * sqrt(0.38))  // ground → P1
+        let asc2  = max(frameDur, ascentDuration  * sqrt(0.37))  // P1 → P2 (delta)
+        let desc3 = max(frameDur, descentDuration * sqrt(0.75))  // P2 → ground
+
+        func hop(to y: CGFloat, duration: TimeInterval) -> [SKAction] {
+            [
+                spawnPhaseLabels(.squat),
+                setPhase(.squat),
+                scaleGroup(x: config.squatScaleX, y: config.squatScaleY, duration: config.squatDuration),
+                spawnPhaseLabels(.ascending),
+                setPhase(.ascending),
+                scaleGroup(x: config.launchScaleX, y: config.launchScaleY, duration: frameDur),
+                SKAction.group([
+                    moveTo(y: y, duration: duration, timing: .easeOut),
+                    scaleGroup(x: 1, y: 1, duration: duration * 0.4)
+                ]),
+            ]
+        }
+        let land: [SKAction] = [
+            spawnPhaseLabels(.landing),
+            setPhase(.landing),
+            .run { [weak self] in self?.fireHaptic() },
+            scaleGroup(x: config.landScaleX, y: config.landScaleY, duration: frameDur),
+            scaleGroup(x: 1, y: 1, duration: config.landingDuration),
+        ]
+
+        var steps: [SKAction] = []
+        steps += hop(to: p1Y, duration: asc1) + land   // Leg 1: ground → platform 1
+        steps += hop(to: p2Y, duration: asc2) + land   // Leg 2: platform 1 → platform 2
+        steps += [                                     // Leg 3: platform 2 → ground
+            spawnPhaseLabels(.descending),
+            setPhase(.descending),
+            moveTo(y: restY, duration: desc3, timing: .easeIn),
+        ] + land
+        steps += [
+            setPhase(.idle),
+            .run { [weak self] in
+                guard let self else { return }
+                self.isJumping = false
+                self.hasUsedDoubleJump = false
                 if self.isLooping {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
                         self?.startJump()
