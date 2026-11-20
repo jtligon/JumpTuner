@@ -216,7 +216,8 @@ platform :ios do
 
     fields = {
       "token"        => token,
-      "name"         => "JumpTuner",
+      # JumpTuner → "PR Builds" → iOS channel on zealot.jeffro.dev (not secret; the token is).
+      "channel_key"  => ENV.fetch("ZEALOT_CHANNEL_KEY", "f2ff8e00361966d29f9ad047c3240396"),
       "release_type" => "adhoc",
       "source"       => "github-actions",
       "branch"       => options[:branch],
@@ -225,11 +226,14 @@ platform :ios do
       "ci_url"       => ci_url
     }
     form = fields.map { |k, v| "--form-string #{Shellwords.escape("#{k}=#{v}")}" }.join(" ")
-    out = sh(
-      "curl -sS --fail-with-body #{resolve} #{form} -F file=@#{Shellwords.escape(options[:ipa])} https://#{host}/api/apps/upload",
+    resp_file = "/tmp/zealot_response.json"
+    code = sh(
+      "curl -sS -o #{resp_file} -w '%{http_code}' #{resolve} #{form} -F file=@#{Shellwords.escape(options[:ipa])} https://#{host}/api/apps/upload",
       log: false
-    )
-    release = JSON.parse(out) rescue {}
+    ).strip
+    body = File.exist?(resp_file) ? File.read(resp_file) : ""
+    UI.user_error!("Zealot upload failed (HTTP #{code}): #{body[0, 1000]}") unless code.start_with?("2")
+    release = JSON.parse(body) rescue {}
     url = release["release_url"] || release["install_url"] || "https://#{host}"
     UI.success("Uploaded to Zealot: #{url}")
     File.write(ENV["ZEALOT_RESULT_FILE"], url) if ENV["ZEALOT_RESULT_FILE"]
