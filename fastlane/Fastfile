@@ -198,6 +198,10 @@ platform :ios do
            force: true, api_key: api_key)
     end
 
+    # sigh may create a profile with a suffixed name (e.g. when the old one went invalid
+    # and its name is still taken), so sign with whatever name it actually produced.
+    profile_name = lane_context[SharedValues::SIGH_NAME] || ADHOC_PROFILE_NAME
+
     ipa = build_app(
       scheme:        "JumpTuner",
       configuration: "Release",
@@ -209,12 +213,12 @@ platform :ios do
         "CURRENT_PROJECT_VERSION=#{build_num}",
         "CODE_SIGN_STYLE=Manual",
         "CODE_SIGN_IDENTITY='Apple Distribution'",
-        "PROVISIONING_PROFILE_SPECIFIER='#{ADHOC_PROFILE_NAME}'"
+        "PROVISIONING_PROFILE_SPECIFIER='#{profile_name}'"
       ].join(" "),
       export_options: {
         method:               "ad-hoc",
         signingStyle:         "manual",
-        provisioningProfiles: { bundle_id => ADHOC_PROFILE_NAME }
+        provisioningProfiles: { bundle_id => profile_name }
       }
     )
 
