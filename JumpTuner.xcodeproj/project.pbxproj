@@ -10,6 +10,7 @@
 		7C92AF6B2F9EB9E700DA02C5 /* ARCHITECTURE.md in Resources */ = {isa = PBXBuildFile; fileRef = 7C92AF5C2F9EB9E700DA02C5 /* ARCHITECTURE.md */; };
 		7C92AF6C2F9EB9E700DA02C5 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 7C92AF682F9EB9E700DA02C5 /* README.md */; };
 		9B921AFA3B1CE6F817E9EB21 /* WatchConnectivity.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E30012EB6B7B42D0BEFDAA85 /* WatchConnectivity.framework */; };
+		D1FF0003D1FF0003D1FF0003 /* StableDiffusion in Frameworks */ = {isa = PBXBuildFile; productRef = D1FF0002D1FF0002D1FF0002 /* StableDiffusion */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -64,6 +65,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9B921AFA3B1CE6F817E9EB21 /* WatchConnectivity.framework in Frameworks */,
+				D1FF0003D1FF0003D1FF0003 /* StableDiffusion in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +127,9 @@
 				7C21C7DD2F9D9BF60002AF98 /* JumpTuner */,
 			);
 			name = JumpTuner;
+			packageProductDependencies = (
+				D1FF0002D1FF0002D1FF0002 /* StableDiffusion */,
+			);
 			productName = JumpTuner;
 			productReference = 7C21C7DB2F9D9BF60002AF98 /* JumpTuner.app */;
 			productType = "com.apple.product-type.application";
@@ -181,6 +186,9 @@
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7C21C7DC2F9D9BF60002AF98 /* Products */;
+			packages = (
+				D1FF0001D1FF0001D1FF0001 /* XCRemoteSwiftPackageReference "ml-stable-diffusion" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -518,6 +526,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D1FF0001D1FF0001D1FF0001 /* XCRemoteSwiftPackageReference "ml-stable-diffusion" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/ml-stable-diffusion";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = "1.0.0";
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D1FF0002D1FF0002D1FF0002 /* StableDiffusion */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D1FF0001D1FF0001D1FF0001 /* XCRemoteSwiftPackageReference "ml-stable-diffusion" */;
+			productName = StableDiffusion;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7C21C7D32F9D9BF60002AF98 /* Project object */;
 }
