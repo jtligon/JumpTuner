@@ -7,6 +7,7 @@ struct CharacterPickerView: View {
     let skins: [CharacterSkin]
     @Binding var selectedSkin: CharacterSkin
     let onAddPhoto: () -> Void
+    let onGenerateAI: () -> Void
 
     var body: some View {
         CollapsibleSection(title: "Characters", icon: "person.2.fill",
@@ -27,6 +28,16 @@ struct CharacterPickerView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Add character from photo")
+
+                Button(action: onGenerateAI) {
+                    CharacterTile(isSelected: false) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Generate character with AI")
             }
             .padding(.horizontal, 12)
             .padding(.top, 2)

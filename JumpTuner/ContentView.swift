@@ -14,6 +14,7 @@ struct ContentView: View {
     @State private var selectedSkin: CharacterSkin = .robot
     @State private var customSkins: [CharacterSkin] = []
     @State private var showingPhotoPicker = false
+    @State private var showingAIGenerator = false
 
     private let drawerWidth: CGFloat = 260
 
@@ -99,9 +100,9 @@ struct ContentView: View {
                     ScrollView {
                         VStack(spacing: 8) {
                             CharacterPickerView(skins: CharacterSkin.builtIn + customSkins,
-                                                selectedSkin: $selectedSkin) {
-                                showingPhotoPicker = true
-                            }
+                                                selectedSkin: $selectedSkin,
+                                                onAddPhoto: { showingPhotoPicker = true },
+                                                onGenerateAI: { showingAIGenerator = true })
                             ParamsEditorView(params: $params, showFloatingText: $showFloatingText)
                             PresetsView(
                                 store: store,
@@ -132,6 +133,12 @@ struct ContentView: View {
         .characterPhotoFlow(isPresented: $showingPhotoPicker) { newSkin in
             customSkins.append(newSkin)
             selectedSkin = newSkin
+        }
+        .sheet(isPresented: $showingAIGenerator) {
+            AICharacterGeneratorView { newSkin in
+                customSkins.append(newSkin)
+                selectedSkin = newSkin
+            }
         }
         .sheet(item: $selectedQRPreset) { preset in
             PresetQRView(preset: preset)
