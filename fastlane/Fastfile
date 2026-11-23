@@ -15,7 +15,25 @@
 
 require 'base64'
 
+require 'shellwords'
+
 default_platform(:ios)
+
+  # True when the portal's enabled iPhone/iPad devices differ from those in the profile.
+  def adhoc_profile_stale?(profile_path)
+    require "plist"
+    profile = Plist.parse_xml(`security cms -D -i #{Shellwords.escape(profile_path)} 2>/dev/null`)
+    in_profile = (profile && profile["ProvisionedDevices"]) || []
+    registered = Spaceship::ConnectAPI::Device.all.select do |d|
+      d.enabled? && %w[IPHONE IPAD].include?(d.device_class.to_s)
+    end.map(&:udid)
+    missing = registered.map(&:downcase) - in_profile.map(&:downcase)
+    UI.message("Devices missing from ad hoc profile: #{missing.join(', ')}") unless missing.empty?
+    !missing.empty?
+  rescue => e
+    UI.important("Could not compare ad hoc profile devices (#{e.class}: #{e.message}); keeping profile")
+    false
+  end
 
 platform :ios do
   desc "Build and test on simulator"
@@ -107,24 +125,34 @@ platform :ios do
     end
   end
 
-  desc "Build a PR branch and upload to TestFlight for review"
-  lane :pr_beta do
-    pr_number = ENV.fetch("PR_NUMBER", "0")
-    pr_title  = ENV.fetch("PR_TITLE",  "PR build")
+  # ── CI distribution lanes ────────────────────────────────────────────────────
+  #
+  #   PRs   → pr_adhoc   → Zealot (zealot.jeffro.dev), unique bundle ID per PR so
+  #                         several PR builds can be installed side by side.
+  #   main  → main_beta  → TestFlight with the real bundle ID.
 
-    # Install provisioning profile
+  APP_BUNDLE_ID      = "visceralorigami.JumpTuner"
+  ADHOC_APP_ID       = "visceralorigami.*"           # wildcard App ID (portal)
+  ADHOC_PROFILE_NAME = "JumpTuner AdHoc Wildcard"
+
+  private_lane :ci_api_key do
+    app_store_connect_api_key(
+      key_id:                ENV["ASC_KEY_ID"],
+      issuer_id:             ENV["ASC_ISSUER_ID"],
+      key_content:           ENV["ASC_KEY_CONTENT"],
+      is_key_content_base64: true
+    )
+  end
+
+  desc "main → TestFlight (real bundle ID). Run by .github/workflows/main-beta.yml"
+  lane :main_beta do
     profile_b64 = ENV["PROVISIONING_PROFILE_BASE64"]
     UI.user_error!("PROVISIONING_PROFILE_BASE64 secret is not set") if profile_b64.nil? || profile_b64.empty?
     profile_path = "/tmp/profile.mobileprovision"
     File.binwrite(profile_path, Base64.decode64(profile_b64))
     install_provisioning_profile(path: profile_path)
 
-    api_key = app_store_connect_api_key(
-      key_id:                ENV["ASC_KEY_ID"],
-      issuer_id:             ENV["ASC_ISSUER_ID"],
-      key_content:           ENV["ASC_KEY_CONTENT"],
-      is_key_content_base64: true
-    )
+    api_key = ci_api_key
 
     increment_build_number(
       build_number: latest_testflight_build_number(api_key: api_key) + 1,
@@ -138,14 +166,109 @@ platform :ios do
       export_options: {
         method:               "app-store",
         signingStyle:         "manual",
-        provisioningProfiles: { "visceralorigami.JumpTuner" => "JumpTunerDist" }
+        provisioningProfiles: { APP_BUNDLE_ID => "JumpTunerDist" }
       }
     )
 
+    changelog = ENV.fetch("CHANGELOG") { sh("git log -1 --pretty=%s", log: false).strip }
     upload_to_testflight(
       api_key:                           api_key,
       skip_waiting_for_build_processing: true,
-      changelog:                         "PR ##{pr_number}: #{pr_title}"
+      changelog:                         changelog
     )
+  end
+
+  desc "PR → ad hoc build with bundle ID visceralorigami.JumpTuner.pr<N>, uploaded to Zealot"
+  lane :pr_adhoc do
+    pr_number = ENV.fetch("PR_NUMBER") { UI.user_error!("PR_NUMBER is not set") }
+    pr_title  = ENV.fetch("PR_TITLE", "PR build")
+    branch    = ENV.fetch("PR_BRANCH") { git_branch }
+    bundle_id = "#{APP_BUNDLE_ID}.pr#{pr_number}"
+    build_num = ENV.fetch("GITHUB_RUN_NUMBER") { Time.now.strftime("%Y%m%d%H%M") }
+
+    # Fetches (or creates) the wildcard ad hoc profile. If the devices registered in
+    # the portal differ from the ones in the existing profile, it is regenerated, so a
+    # newly registered iPhone is picked up by the next PR build automatically.
+    api_key = ci_api_key
+    sigh(adhoc: true, app_identifier: ADHOC_APP_ID, provisioning_name: ADHOC_PROFILE_NAME,
+         force: ENV["ADHOC_FORCE"] == "true", api_key: api_key)
+    if ENV["ADHOC_FORCE"] != "true" && adhoc_profile_stale?(lane_context[SharedValues::SIGH_PROFILE_PATH])
+      UI.important("Registered devices changed; regenerating #{ADHOC_PROFILE_NAME}")
+      sigh(adhoc: true, app_identifier: ADHOC_APP_ID, provisioning_name: ADHOC_PROFILE_NAME,
+           force: true, api_key: api_key)
+    end
+
+    # sigh may create a profile with a suffixed name (e.g. when the old one went invalid
+    # and its name is still taken), so sign with whatever name it actually produced.
+    profile_name = lane_context[SharedValues::SIGH_NAME] || ADHOC_PROFILE_NAME
+
+    ipa = build_app(
+      scheme:        "JumpTuner",
+      configuration: "Release",
+      export_method: "ad-hoc",
+      output_name:   "JumpTuner-pr#{pr_number}.ipa",
+      xcargs: [
+        "PRODUCT_BUNDLE_IDENTIFIER=#{bundle_id}",
+        "INFOPLIST_KEY_CFBundleDisplayName='JT PR#{pr_number}'",
+        "CURRENT_PROJECT_VERSION=#{build_num}",
+        "CODE_SIGN_STYLE=Manual",
+        "CODE_SIGN_IDENTITY='Apple Distribution'",
+        "PROVISIONING_PROFILE_SPECIFIER='#{profile_name}'"
+      ].join(" "),
+      export_options: {
+        method:               "ad-hoc",
+        signingStyle:         "manual",
+        provisioningProfiles: { bundle_id => profile_name }
+      }
+    )
+
+    zealot_upload(
+      ipa:       ipa,
+      branch:    branch,
+      changelog: "PR ##{pr_number}: #{pr_title}"
+    )
+  end
+
+  desc "Upload an IPA to Zealot. Needs ZEALOT_TOKEN; ZEALOT_RESOLVE_IP pins DNS (CI over Tailscale)"
+  private_lane :zealot_upload do |options|
+    require "json"
+    require "shellwords"
+    host  = ENV.fetch("ZEALOT_HOST", "zealot.jeffro.dev")
+    token = ENV.fetch("ZEALOT_TOKEN") { UI.user_error!("ZEALOT_TOKEN is not set") }
+    resolve = ENV["ZEALOT_RESOLVE_IP"].to_s.empty? ? "" : "--resolve #{host}:443:#{ENV['ZEALOT_RESOLVE_IP']}"
+    ci_url = ENV["GITHUB_RUN_ID"] ? "#{ENV['GITHUB_SERVER_URL']}/#{ENV['GITHUB_REPOSITORY']}/actions/runs/#{ENV['GITHUB_RUN_ID']}" : ""
+
+    fields = {
+      "token"        => token,
+      # JumpTuner → "PR Builds" → iOS channel on zealot.jeffro.dev (not secret; the token is).
+      "channel_key"  => ENV.fetch("ZEALOT_CHANNEL_KEY", "f2ff8e00361966d29f9ad047c3240396"),
+      "release_type" => "adhoc",
+      "source"       => "github-actions",
+      "branch"       => options[:branch],
+      "git_commit"   => ENV.fetch("GITHUB_SHA") { last_git_commit[:commit_hash] },
+      "changelog"    => options[:changelog],
+      "ci_url"       => ci_url
+    }
+    form = fields.map { |k, v| "--form-string #{Shellwords.escape("#{k}=#{v}")}" }.join(" ")
+    resp_file = "/tmp/zealot_response.json"
+    code = sh(
+      "curl -sS -o #{resp_file} -w '%{http_code}' #{resolve} #{form} -F file=@#{Shellwords.escape(options[:ipa])} https://#{host}/api/apps/upload",
+      log: false
+    ).strip
+    body = File.exist?(resp_file) ? File.read(resp_file) : ""
+    UI.user_error!("Zealot upload failed (HTTP #{code}): #{body[0, 1000]}") unless code.start_with?("2")
+    release = JSON.parse(body) rescue {}
+    url = release["release_url"] || release["install_url"] || "https://#{host}"
+    UI.success("Uploaded to Zealot: #{url}")
+    File.write(ENV["ZEALOT_RESULT_FILE"], url) if ENV["ZEALOT_RESULT_FILE"]
+    url
+  end
+
+  desc "Register a device and regenerate the wildcard ad hoc profile. Usage: fastlane add_device name:\"Jeff iPhone\" udid:XXXX"
+  lane :add_device do |options|
+    api_key = ci_api_key
+    register_devices(devices: { options[:name] => options[:udid] }, api_key: api_key)
+    sigh(adhoc: true, app_identifier: ADHOC_APP_ID, provisioning_name: ADHOC_PROFILE_NAME,
+         force: true, api_key: api_key, skip_install: true)
   end
 end
