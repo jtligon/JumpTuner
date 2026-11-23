@@ -20,7 +20,9 @@ concurrency:
 jobs:
   zealot:
     name: Ad hoc build → Zealot
-    runs-on: macos-latest
+    # The xcode-27 image has the iOS 27 SDK that App Store Connect requires;
+    # macos-latest still tops out at Xcode 26.
+    runs-on: xcode-27
     # Fork PRs never get secrets; skip instead of failing.
     if: github.event.pull_request.head.repo.full_name == github.repository
 
@@ -39,9 +41,9 @@ jobs:
         if: steps.secrets.outputs.configured == 'true'
         uses: actions/checkout@v4
 
-      - name: Select Xcode 26
+      - name: Select Xcode 27
         if: steps.secrets.outputs.configured == 'true'
-        run: sudo xcode-select -s $(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+        run: sudo xcode-select -s $(ls -d /Applications/Xcode_27.*.app | sort -V | tail -1)
 
       - name: Set up Ruby
         if: steps.secrets.outputs.configured == 'true'
