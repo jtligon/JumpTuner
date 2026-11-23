@@ -15,7 +15,25 @@
 
 require 'base64'
 
+require 'shellwords'
+
 default_platform(:ios)
+
+  # True when the portal's enabled iPhone/iPad devices differ from those in the profile.
+  def adhoc_profile_stale?(profile_path)
+    require "plist"
+    profile = Plist.parse_xml(`security cms -D -i #{Shellwords.escape(profile_path)} 2>/dev/null`)
+    in_profile = (profile && profile["ProvisionedDevices"]) || []
+    registered = Spaceship::ConnectAPI::Device.all.select do |d|
+      d.enabled? && %w[IPHONE IPAD].include?(d.device_class.to_s)
+    end.map(&:udid)
+    missing = registered.map(&:downcase) - in_profile.map(&:downcase)
+    UI.message("Devices missing from ad hoc profile: #{missing.join(', ')}") unless missing.empty?
+    !missing.empty?
+  rescue => e
+    UI.important("Could not compare ad hoc profile devices (#{e.class}: #{e.message}); keeping profile")
+    false
+  end
 
 platform :ios do
   desc "Build and test on simulator"
@@ -168,15 +186,17 @@ platform :ios do
     bundle_id = "#{APP_BUNDLE_ID}.pr#{pr_number}"
     build_num = ENV.fetch("GITHUB_RUN_NUMBER") { Time.now.strftime("%Y%m%d%H%M") }
 
-    # Fetches (or creates) the wildcard ad hoc profile containing every
-    # registered device. Set ADHOC_FORCE=true to regenerate it after adding devices.
-    sigh(
-      adhoc:            true,
-      app_identifier:   ADHOC_APP_ID,
-      provisioning_name: ADHOC_PROFILE_NAME,
-      force:            ENV["ADHOC_FORCE"] == "true",
-      api_key:          ci_api_key
-    )
+    # Fetches (or creates) the wildcard ad hoc profile. If the devices registered in
+    # the portal differ from the ones in the existing profile, it is regenerated, so a
+    # newly registered iPhone is picked up by the next PR build automatically.
+    api_key = ci_api_key
+    sigh(adhoc: true, app_identifier: ADHOC_APP_ID, provisioning_name: ADHOC_PROFILE_NAME,
+         force: ENV["ADHOC_FORCE"] == "true", api_key: api_key)
+    if ENV["ADHOC_FORCE"] != "true" && adhoc_profile_stale?(lane_context[SharedValues::SIGH_PROFILE_PATH])
+      UI.important("Registered devices changed; regenerating #{ADHOC_PROFILE_NAME}")
+      sigh(adhoc: true, app_identifier: ADHOC_APP_ID, provisioning_name: ADHOC_PROFILE_NAME,
+           force: true, api_key: api_key)
+    end
 
     ipa = build_app(
       scheme:        "JumpTuner",
