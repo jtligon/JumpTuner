@@ -91,6 +91,21 @@ enum RunCycle {
         referenceBob[frame] * legSegment / referenceLegSegment
     }
 
+    /// Ground speed, in points per second, that plays the cycle at its normal
+    /// pace for the reference leg length. This is the auto-run speed.
+    private static let referenceGroundSpeed: CGFloat = 120
+    /// Keeps the legs visibly moving on the lightest joystick push.
+    static let minimumPlaybackRate: CGFloat = 0.2
+
+    /// How fast to play the cycle so the stride keeps pace with the ground:
+    /// proportional to speed, and slower for longer legs, which cover more
+    /// ground per step.
+    static func playbackRate(groundSpeed: CGFloat, legSegment: CGFloat) -> CGFloat {
+        guard legSegment > 0 else { return 1 }
+        let rate = abs(groundSpeed) / referenceGroundSpeed * referenceLegSegment / legSegment
+        return max(rate, minimumPlaybackRate)
+    }
+
     /// Height of the sole above the ground for a leg pose, before bounce.
     static func footHeight(_ pose: LimbPose, legSegment: CGFloat) -> CGFloat {
         let root = pose.root * .pi / 180
@@ -165,6 +180,7 @@ final class RunRig: SKNode {
     private var nearArm: RunLimb!
     private var farArm: RunLimb!
     private var cycleFrame = 0
+    private(set) var playbackRate: CGFloat = 1
 
     /// - Parameters:
     ///   - legSegment: Length of the thigh, and of the shin.
@@ -221,6 +237,12 @@ final class RunRig: SKNode {
         startCycle()
     }
 
+    /// Paces the stride to how fast the character is moving. Safe to call every frame.
+    func setGroundSpeed(_ speed: CGFloat) {
+        playbackRate = RunCycle.playbackRate(groundSpeed: speed, legSegment: legSegment)
+        action(forKey: "runCycle")?.speed = playbackRate
+    }
+
     /// Holds the leaping pose for a jump taken mid-run. `.idle` means the jump
     /// has finished, so the stride picks back up. No effect when not running.
     func setJumpPhase(_ phase: JumpPhase) {
@@ -258,6 +280,7 @@ final class RunRig: SKNode {
             }
         ])
         run(.repeatForever(step), withKey: "runCycle")
+        action(forKey: "runCycle")?.speed = playbackRate
     }
 
     /// Limbs on opposite sides are half a cycle apart, and each arm swings
