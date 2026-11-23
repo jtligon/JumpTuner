@@ -9,14 +9,16 @@ on:
 jobs:
   test:
     name: Build and Test
-    runs-on: macos-latest
+    # The xcode-27 image has the iOS 27 SDK that App Store Connect requires;
+    # macos-latest still tops out at Xcode 26.
+    runs-on: xcode-27
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 26
-        run: sudo xcode-select -s $(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+      - name: Select Xcode 27
+        run: sudo xcode-select -s $(ls -d /Applications/Xcode_27.*.app | sort -V | tail -1)
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

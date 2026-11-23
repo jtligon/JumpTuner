@@ -40,7 +40,7 @@ platform :ios do
   lane :test do
     run_tests(
       scheme:         "JumpTuner",
-      destination:    "platform=iOS Simulator,OS=latest,name=iPhone 17 Pro",
+      destination:    "platform=iOS Simulator,OS=latest,name=iPhone 18 Pro",
       result_bundle:  true
     )
   end
